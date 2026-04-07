@@ -1,24 +1,32 @@
-const express = require('express');
-const router = express.Router();
+const express = require('express')
+const router = express.Router()
 
-
-
-const verificarToken = require('../middlewares/auth.middleware');
-
+const verificarToken = require('../middlewares/auth.middleware')
 const {
   emitirCertificado,
   verificarCertificado,
-  descargarCertificado
-} = require('../controllers/certificado.controller');
+  descargarCertificado,
+  listarCertificados,
+  obtenerCertificado,
+} = require('../controllers/certificado.controller')
+const {
+  validateCertificado,
+  handleValidationErrors,
+} = require('../utils/validators')
 
+// Rutas protegidas (requieren autenticación)
+router.post(
+  '/emitir',
+  verificarToken,
+  validateCertificado,
+  handleValidationErrors,
+  emitirCertificado,
+)
+router.get('/listar', verificarToken, listarCertificados)
+router.get('/descargar/:id', verificarToken, descargarCertificado)
+router.get('/:id', verificarToken, obtenerCertificado)
 
-// Ruta protegida
-router.post('/emitir', verificarToken, emitirCertificado);
+// Rutas públicas
+router.post('/verificar', verificarCertificado)
 
-// Ruta pública
-router.post('/verificar', verificarCertificado);
-
-// Ruta certificados
-router.get('/pdf/:id', descargarCertificado);
-
-module.exports = router;
+module.exports = router

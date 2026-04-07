@@ -1,25 +1,37 @@
-const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken')
+const { sendError } = require('../utils/response.utils')
 
 // Middleware que protege rutas
 const verificarToken = (req, res, next) => {
-  const token = req.headers['authorization'];
-
-  if (!token) {
-    return res.status(401).json({
-      error: 'Token requerido'
-    });
-  }
-
   try {
-    const decoded = jwt.verify(token, 'secreto123');
-    req.usuario = decoded;
+    const authHeader = req.headers['authorization']
 
-    next(); // continúa a la ruta
+    if (!authHeader) {
+      return sendError(res, 'Token requerido', 401)
+    }
+
+    // Extraer token del formato "Bearer <token>"
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : authHeader
+
+    if (!token) {
+      return sendError(res, 'Token inválido o malformado', 401)
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secreto123')
+    req.usuario = decoded
+
+    next() // continúa a la ruta
   } catch (error) {
-    return res.status(401).json({
-      error: 'Token inválido'
-    });
+    if (error.name === 'TokenExpiredError') {
+      return sendError(res, 'Token expirado', 401)
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return sendError(res, 'Token inválido', 401)
+    }
+    return sendError(res, 'Error de autenticación', 401)
   }
-};
+}
 
-module.exports = verificarToken;
+module.exports = verificarToken

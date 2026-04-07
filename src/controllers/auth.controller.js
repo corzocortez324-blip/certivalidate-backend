@@ -1,72 +1,119 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+const { sendSuccess, sendError } = require('../utils/response.utils')
 
 // Base de datos temporal
-let usuarios = [];
+let usuarios = []
 
 // REGISTER
 const register = async (req, res) => {
-  const { nombre, email, password } = req.body;
+  try {
+    const { nombre, email, password } = req.body
 
-  if (!nombre || !email || !password) {
-    return res.status(400).json({
-      error: 'Todos los campos son obligatorios'
-    });
+    // Verificar si el usuario ya existe
+    const usuarioExistente = usuarios.find((u) => u.email === email)
+    if (usuarioExistente) {
+      return sendError(res, 'El email ya está registrado', 409)
+    }
+
+    // Hashear contraseña
+    const hash = await bcrypt.hash(password, 10)
+
+    const nuevoUsuario = {
+      id: usuarios.length + 1,
+      nombre,
+      email,
+      password: hash,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+
+    usuarios.push(nuevoUsuario)
+
+    // No retornar contraseña
+    const { password: _, ...usuarioSinPassword } = nuevoUsuario
+
+    return sendSuccess(
+      res,
+      usuarioSinPassword,
+      'Usuario registrado correctamente',
+      201,
+    )
+  } catch (error) {
+    console.error('Error en register:', error)
+    return sendError(res, 'Error en el registro', 500)
   }
-
-  const hash = await bcrypt.hash(password, 10);
-
-  const nuevoUsuario = {
-    id: usuarios.length + 1,
-    nombre,
-    email,
-    password: hash
-  };
-
-  usuarios.push(nuevoUsuario);
-
-  res.json({
-    mensaje: 'Usuario creado correctamente',
-    usuario: nuevoUsuario
-  });
-};
+}
 
 // LOGIN
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body
 
-  if (!email || !password) {
-    return res.status(400).json({
-      error: 'Email y password son obligatorios'
-    });
+    if (!email || !password) {
+      return sendError(res, 'Email y password son obligatorios', 400)
+    }
+
+    const usuario = usuarios.find((u) => u.email === email)
+
+    if (!usuario) {
+      return sendError(res, 'Credenciales inválidas', 401)
+    }
+
+    const passwordValida = await bcrypt.compare(password, usuario.password)
+
+    if (!passwordValida) {
+      return sendError(res, 'Credenciales inválidas', 401)
+    }
+
+    const token = jwt.sign(
+      { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
+      process.env.JWT_SECRET || 'secreto123',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+    )
+
+    return sendSuccess(
+      res,
+      {
+        token,
+        usuario: {
+          id: usuario.id,
+          nombre: usuario.nombre,
+          email: usuario.email,
+        },
+      },
+      'Login exitoso',
+      200,
+    )
+  } catch (error) {
+    console.error('Error en login:', error)
+    return sendError(res, 'Error en el login', 500)
   }
+}
 
-  const usuario = usuarios.find(u => u.email === email);
+// Obtener perfil del usuario autenticado
+const obtenerPerfil = (req, res) => {
+  try {
+    const usuario = usuarios.find((u) => u.id === req.usuario.id)
 
-  if (!usuario) {
-    return res.status(404).json({
-      error: 'Usuario no existe'
-    });
+    if (!usuario) {
+      return sendError(res, 'Usuario no encontrado', 404)
+    }
+
+    const { password: _, ...usuarioSinPassword } = usuario
+
+    return sendSuccess(
+      res,
+      usuarioSinPassword,
+      'Perfil obtenido correctamente',
+      200,
+    )
+  } catch (error) {
+    console.error('Error en obtenerPerfil:', error)
+    return sendError(res, 'Error al obtener perfil', 500)
   }
+}
 
-  const valid = await bcrypt.compare(password, usuario.password);
+module.exports = { register, login, obtenerPerfil }
 
-  if (!valid) {
-    return res.status(401).json({
-      error: 'Contraseña incorrecta'
-    });
-  }
-
-  const token = jwt.sign(
-    { id: usuario.id, email: usuario.email },
-    'secreto123',
-    { expiresIn: '1h' }
-  );
-
-  res.json({
-    mensaje: 'Login exitoso',
-    token
-  });
-};
-
-module.exports = { register, login };
+module.exports = { register, login, obtenerPerfil }
