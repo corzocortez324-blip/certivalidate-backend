@@ -1,37 +1,37 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const { sendSuccess, sendError } = require('../utils/response.utils')
-
-// Base de datos temporal
-let usuarios = []
+const prisma = require('../utils/prisma')
 
 // REGISTER
 const register = async (req, res) => {
   try {
-    const { nombre, email, password } = req.body
+    const { nombre, apellido, email, password } = req.body
 
-    // Verificar si el usuario ya existe
-    const usuarioExistente = usuarios.find((u) => u.email === email)
+    if (!nombre || !email || !password) {
+      return sendError(res, 'Nombre, email y password son obligatorios', 400)
+    }
+
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { email }
+    })
+
     if (usuarioExistente) {
       return sendError(res, 'El email ya está registrado', 409)
     }
 
-    // Hashear contraseña
     const hash = await bcrypt.hash(password, 10)
 
-    const nuevoUsuario = {
-      id: usuarios.length + 1,
-      nombre,
-      email,
-      password: hash,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
+    const nuevoUsuario = await prisma.usuario.create({
+      data: {
+        nombre,
+        apellido: apellido || '', // Por ahora lo dejamos vacío si no lo envían
+        email,
+        password_hash: hash,
+      }
+    })
 
-    usuarios.push(nuevoUsuario)
-
-    // No retornar contraseña
-    const { password: _, ...usuarioSinPassword } = nuevoUsuario
+    const { password_hash: _, ...usuarioSinPassword } = nuevoUsuario
 
     return sendSuccess(
       res,
@@ -54,13 +54,15 @@ const login = async (req, res) => {
       return sendError(res, 'Email y password son obligatorios', 400)
     }
 
-    const usuario = usuarios.find((u) => u.email === email)
+    const usuario = await prisma.usuario.findUnique({
+      where: { email }
+    })
 
     if (!usuario) {
       return sendError(res, 'Credenciales inválidas', 401)
     }
 
-    const passwordValida = await bcrypt.compare(password, usuario.password)
+    const passwordValida = await bcrypt.compare(password, usuario.password_hash)
 
     if (!passwordValida) {
       return sendError(res, 'Credenciales inválidas', 401)
@@ -92,15 +94,17 @@ const login = async (req, res) => {
 }
 
 // Obtener perfil del usuario autenticado
-const obtenerPerfil = (req, res) => {
+const obtenerPerfil = async (req, res) => {
   try {
-    const usuario = usuarios.find((u) => u.id === req.usuario.id)
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: req.usuario.id }
+    })
 
     if (!usuario) {
       return sendError(res, 'Usuario no encontrado', 404)
     }
 
-    const { password: _, ...usuarioSinPassword } = usuario
+    const { password_hash: _, ...usuarioSinPassword } = usuario
 
     return sendSuccess(
       res,
@@ -113,7 +117,5 @@ const obtenerPerfil = (req, res) => {
     return sendError(res, 'Error al obtener perfil', 500)
   }
 }
-
-module.exports = { register, login, obtenerPerfil }
 
 module.exports = { register, login, obtenerPerfil }

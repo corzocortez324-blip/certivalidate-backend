@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+//////////////////////////
+// 🏢 INSTITUCIONES
+//////////////////////////
+model Institucion {
+  id        String   @id @default(uuid())
+  nombre    String
+  dominio   String?
+  logo_url  String?
+  activa    Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  usuarios       UsuarioInstitucion[]
+  estudiantes    Estudiante[]
+  plantillas     PlantillaCertificado[]
+  certificados   Certificado[]
+  integraciones  Integracion[]
+}
+
+//////////////////////////
+// 👤 USUARIOS
+//////////////////////////
+model Usuario {
+  id              String   @id @default(uuid())
+  nombre          String
+  apellido        String
+  email           String   @unique
+  password_hash   String
+  activo          Boolean  @default(true)
+  ultimo_acceso   DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime?
+  deleted_at      DateTime?
+
+  instituciones   UsuarioInstitucion[]
+  auditorias      Auditoria[]
+  revocaciones    Revocacion[]
+}
+
+//////////////////////////
+// 🔗 USUARIO-INSTITUCION
+//////////////////////////
+model UsuarioInstitucion {
+  id             String   @id @default(uuid())
+  usuario_id     String
+  institucion_id String
+  rol_id         String
+  created_at     DateTime @default(now())
+
+  usuario     Usuario    @relation(fields: [usuario_id], references: [id])
+  institucion Institucion @relation(fields: [institucion_id], references: [id])
+  rol         Rol        @relation(fields: [rol_id], references: [id])
+}
+
+//////////////////////////
+// 🛡️ ROLES
+//////////////////////////
+model Rol {
+  id          String   @id @default(uuid())
+  nombre      String
+  descripcion String?
+
+  usuarios UsuarioInstitucion[]
+  permisos RolPermiso[]
+}
+
+//////////////////////////
+// 🔐 PERMISOS
+//////////////////////////
+model Permiso {
+  id      String @id @default(uuid())
+  recurso String
+  accion  String
+
+  roles RolPermiso[]
+}
+
+//////////////////////////
+// 🔗 ROL-PERMISO
+//////////////////////////
+model RolPermiso {
+  rol_id     String
+  permiso_id String
+
+  rol     Rol     @relation(fields: [rol_id], references: [id])
+  permiso Permiso @relation(fields: [permiso_id], references: [id])
+
+  @@id([rol_id, permiso_id])
+}
+
+//////////////////////////
+// 🔌 INTEGRACIONES
+//////////////////////////
+model Integracion {
+  id                 String   @id @default(uuid())
+  institucion_id     String
+  tipo               String
+  url_base           String?
+  api_key            String?
+  activa             Boolean  @default(true)
+  ultima_verificacion DateTime?
+
+  institucion Institucion @relation(fields: [institucion_id], references: [id])
+}
+
+//////////////////////////
+// 🎓 ESTUDIANTES
+//////////////////////////
+model Estudiante {
+  id             String   @id @default(uuid())
+  institucion_id String
+  nombre         String
+  apellido       String
+  documento      String
+  email          String?
+  created_at     DateTime @default(now())
+
+  institucion Institucion @relation(fields: [institucion_id], references: [id])
+  certificados Certificado[]
+}
+
+//////////////////////////
+// 🎨 PLANTILLAS
+//////////////////////////
+model PlantillaCertificado {
+  id             String   @id @default(uuid())
+  institucion_id String
+  nombre         String
+  template_html  String
+  version        Int
+  activa         Boolean  @default(true)
+  created_at     DateTime @default(now())
+
+  institucion Institucion @relation(fields: [institucion_id], references: [id])
+  certificados Certificado[]
+}
+
+//////////////////////////
+// 📜 CERTIFICADOS
+//////////////////////////
+model Certificado {
+  id               String   @id @default(uuid())
+  estudiante_id    String
+  institucion_id   String
+  plantilla_id     String
+
+  codigo_unico     String   @unique
+  estado           String
+  fecha_emision    DateTime
+  fecha_expiracion DateTime?
+
+  pdf_url          String?
+  hash_sha256      String?
+
+  created_at       DateTime @default(now())
+  deleted_at       DateTime?
+
+  estudiante  Estudiante          @relation(fields: [estudiante_id], references: [id])
+  institucion Institucion         @relation(fields: [institucion_id], references: [id])
+  plantilla   PlantillaCertificado @relation(fields: [plantilla_id], references: [id])
+
+  metadata       CertificadoMetadata[]
+  revocaciones   Revocacion[]
+  verificaciones VerificacionPublica[]
+  blockchain     BlockchainTransaccion[]
+}
+
+//////////////////////////
+// 🧾 METADATA
+//////////////////////////
+model CertificadoMetadata {
+  id              String @id @default(uuid())
+  certificado_id  String
+  clave           String
+  valor           String
+
+  certificado Certificado @relation(fields: [certificado_id], references: [id])
+}
+
+//////////////////////////
+// 🚫 REVOCACIONES
+//////////////////////////
+model Revocacion {
+  id               String   @id @default(uuid())
+  certificado_id   String
+  revocado_por     String
+  motivo_codigo    String
+  motivo_detalle   String?
+  fecha_revocacion DateTime
+
+  certificado Certificado @relation(fields: [certificado_id], references: [id])
+  usuario     Usuario     @relation(fields: [revocado_por], references: [id])
+}
+
+//////////////////////////
+// 🔍 VERIFICACIONES
+//////////////////////////
+model VerificacionPublica {
+  id             BigInt   @id @default(autoincrement())
+  certificado_id String
+  ip             String?
+  user_agent     String?
+  resultado      String
+  fecha          DateTime @default(now())
+
+  certificado Certificado @relation(fields: [certificado_id], references: [id])
+}
+
+//////////////////////////
+// ⛓️ BLOCKCHAIN
+//////////////////////////
+model BlockchainTransaccion {
+  id             String   @id @default(uuid())
+  certificado_id String
+  hash           String?
+  tx_hash        String?
+  red            String
+  estado         String
+  intentos       Int      @default(0)
+  error_mensaje  String?
+
+  created_at     DateTime @default(now())
+  confirmado_en  DateTime?
+
+  certificado Certificado @relation(fields: [certificado_id], references: [id])
+}
+
+//////////////////////////
+// 📊 AUDITORIA
+//////////////////////////
+model Auditoria {
+  id              BigInt   @id @default(autoincrement())
+  usuario_id      String
+  accion          String
+  entidad         String
+  entidad_id      String
+  valores_antes   String?
+  valores_despues String?
+  ip              String?
+  fecha           DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuario_id], references: [id])
+}

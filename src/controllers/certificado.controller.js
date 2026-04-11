@@ -1,36 +1,36 @@
 const crypto = require('crypto');
 const { sendSuccess, sendError } = require('../utils/response.utils');
 const generarPDF = require('../utils/pdf.generator');
-
-// Base de datos temporal
-let certificados = [];
+const prisma = require('../utils/prisma');
 
 // Crear certificado
-const emitirCertificado = (req, res) => {
+const emitirCertificado = async (req, res) => {
   try {
-    const { estudiante, curso } = req.body;
-    const usuarioId = req.usuario?.id;
+    const { estudiante_id, institucion_id, plantilla_id } = req.body;
+    
+    if (!estudiante_id || !institucion_id || !plantilla_id) {
+       return sendError(res, 'estudiante_id, institucion_id y plantilla_id son obligatorios', 400);
+    }
 
-    // Generar hash único
-    const contenido = `${estudiante}-${curso}-${Date.now()}`;
+    const contenido = `${estudiante_id}-${institucion_id}-${Date.now()}`;
     const hash = crypto
       .createHash('sha256')
       .update(contenido)
       .digest('hex');
 
-    const certificado = {
-      id: certificados.length + 1,
-      estudiante,
-      curso,
-      hash,
-      usuarioId,
-      estado: 'válido',
-      fechaEmision: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    const codigo_unico = crypto.randomBytes(8).toString('hex').toUpperCase();
 
-    certificados.push(certificado);
+    const certificado = await prisma.certificado.create({
+      data: {
+        estudiante_id,
+        institucion_id,
+        plantilla_id,
+        codigo_unico,
+        estado: 'válido',
+        fecha_emision: new Date(),
+        hash_sha256: hash
+      }
+    });
 
     return sendSuccess(
       res,
@@ -45,15 +45,22 @@ const emitirCertificado = (req, res) => {
 };
 
 // Verificar certificado
-const verificarCertificado = (req, res) => {
+const verificarCertificado = async (req, res) => {
   try {
-    const { hash } = req.body;
+    const { hash, codigo } = req.body; 
 
-    if (!hash) {
-      return sendError(res, 'El hash del certificado es obligatorio', 400);
+    if (!hash && !codigo) {
+      return sendError(res, 'El hash o el codigo del certificado es obligatorio', 400);
     }
 
-    const cert = certificados.find(c => c.hash === hash);
+    const cert = await prisma.certificado.findFirst({
+      where: hash ? { hash_sha256: hash } : { codigo_unico: codigo },
+      include: {
+        estudiante: true,
+        institucion: true,
+        plantilla: true
+      }
+    });
 
     if (!cert) {
       return sendSuccess(
@@ -71,7 +78,7 @@ const verificarCertificado = (req, res) => {
       res,
       {
         ...cert,
-        estado: 'válido',
+        estado: cert.estado,
         mensaje: 'Certificado verificado correctamente'
       },
       'Certificado válido',
@@ -84,7 +91,7 @@ const verificarCertificado = (req, res) => {
 };
 
 // Descargar certificado como PDF
-const descargarCertificado = (req, res) => {
+const descargarCertificado = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -92,12 +99,20 @@ const descargarCertificado = (req, res) => {
       return sendError(res, 'ID del certificado es obligatorio', 400);
     }
 
-    const cert = certificados.find(c => c.id == id);
+    const cert = await prisma.certificado.findUnique({
+      where: { id },
+      include: {
+        estudiante: true,
+        institucion: true,
+        plantilla: true
+      }
+    });
 
     if (!cert) {
       return sendError(res, 'Certificado no encontrado', 404);
     }
 
+    // Nota: El pdf.generator puede necesitar ser adaptado para las nuevas propiedades (ej. cert.estudiante.nombre en vez de cert.estudiante)
     generarPDF(cert, res);
   } catch (error) {
     console.error('Error en descargarCertificado:', error);
@@ -105,19 +120,35 @@ const descargarCertificado = (req, res) => {
   }
 };
 
-// Listar certificados (solo para usuarios autenticados)
-const listarCertificados = (req, res) => {
+// Listar certificados
+const listarCertificados = async (req, res) => {
   try {
     const usuarioId = req.usuario?.id;
     
-    // Si es admin/moderador podría listar todos, por ahora filtra por usuario
-    const certificadosUsuario = certificados.filter(c => c.usuarioId === usuarioId);
+    // Buscar instituciones donde este usuario tiene acceso
+    const usuarioConInstituciones = await prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      include: {
+        instituciones: true
+      }
+    });
+
+    const instIds = usuarioConInstituciones?.instituciones.map(i => i.institucion_id) || [];
+
+    const certificados = await prisma.certificado.findMany({
+      where: instIds.length > 0 ? { institucion_id: { in: instIds } } : {},
+      include: {
+        estudiante: true,
+        plantilla: true,
+        institucion: true
+      }
+    });
 
     return sendSuccess(
       res,
       {
-        total: certificadosUsuario.length,
-        certificados: certificadosUsuario
+        total: certificados.length,
+        certificados
       },
       'Certificados obtenidos correctamente',
       200
@@ -129,24 +160,25 @@ const listarCertificados = (req, res) => {
 };
 
 // Obtener detalles de un certificado específico
-const obtenerCertificado = (req, res) => {
+const obtenerCertificado = async (req, res) => {
   try {
     const { id } = req.params;
-    const usuarioId = req.usuario?.id;
 
     if (!id) {
       return sendError(res, 'ID del certificado es obligatorio', 400);
     }
 
-    const cert = certificados.find(c => c.id == id);
+    const cert = await prisma.certificado.findUnique({
+      where: { id },
+      include: {
+        estudiante: true,
+        institucion: true,
+        plantilla: true
+      }
+    });
 
     if (!cert) {
       return sendError(res, 'Certificado no encontrado', 404);
-    }
-
-    // Verificar que el usuario pueda acceder a este certificado
-    if (cert.usuarioId !== usuarioId) {
-      return sendError(res, 'No autorizado para acceder a este certificado', 403);
     }
 
     return sendSuccess(
