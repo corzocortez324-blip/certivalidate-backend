@@ -1,11 +1,22 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
+const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 
 // Listar plantillas activas
 const listarPlantillas = async (req, res) => {
   try {
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para ver plantillas', 403)
+    }
+
     const plantillas = await prisma.plantillaCertificado.findMany({
-      where: { activa: true },
+      where: {
+        activa: true,
+        institucion_id: { in: institucionIds },
+      },
       orderBy: { created_at: 'desc' },
     })
 
@@ -30,12 +41,19 @@ const obtenerPlantilla = async (req, res) => {
       return sendError(res, 'ID de la plantilla es obligatorio', 400)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
     const plantilla = await prisma.plantillaCertificado.findUnique({
       where: { id },
     })
 
     if (!plantilla) {
       return sendError(res, 'Plantilla no encontrada', 404)
+    }
+
+    if (!institucionIds.includes(plantilla.institucion_id)) {
+      return sendError(res, 'No autorizado para ver esta plantilla', 403)
     }
 
     return sendSuccess(res, plantilla, 'Plantilla obtenida correctamente', 200)
@@ -64,6 +82,17 @@ const crearPlantilla = async (req, res) => {
 
     if (!institucion) {
       return sendError(res, 'Institución no encontrada', 404)
+    }
+
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
+    if (!institucionIds.includes(institucion_id)) {
+      return sendError(
+        res,
+        'No autorizado para crear plantilla en esta institución',
+        403,
+      )
     }
 
     const nuevaPlantilla = await prisma.plantillaCertificado.create({
@@ -106,6 +135,17 @@ const actualizarPlantilla = async (req, res) => {
       return sendError(res, 'Plantilla no encontrada', 404)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para actualizar esta plantilla', 403)
+    }
+
+    if (!institucionIds.includes(plantillaExistente.institucion_id)) {
+      return sendError(res, 'No autorizado para actualizar esta plantilla', 403)
+    }
+
     if (institucion_id) {
       const institucion = await prisma.institucion.findUnique({
         where: { id: institucion_id },
@@ -113,6 +153,14 @@ const actualizarPlantilla = async (req, res) => {
 
       if (!institucion) {
         return sendError(res, 'Institución no encontrada', 404)
+      }
+
+      if (!institucionIds.includes(institucion_id)) {
+        return sendError(
+          res,
+          'No autorizado para mover plantilla a esta institución',
+          403,
+        )
       }
     }
 

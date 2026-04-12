@@ -1,5 +1,6 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
+const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 
 // Listar estudiantes con paginación
 const listarEstudiantes = async (req, res) => {
@@ -11,20 +12,39 @@ const listarEstudiantes = async (req, res) => {
     )
     const usuarioId = req.usuario?.id
 
-    const usuarioConInstituciones = await prisma.usuario.findUnique({
-      where: { id: usuarioId },
-      include: { instituciones: true },
-    })
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
 
-    const institucionIds =
-      usuarioConInstituciones?.instituciones.map(
-        (item) => item.institucion_id,
-      ) || []
+    const search = (req.query.search || '').trim()
+    const institucionId = req.query.institucion_id
 
-    const where =
-      institucionIds.length > 0
-        ? { institucion_id: { in: institucionIds } }
-        : {}
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para ver estudiantes', 403)
+    }
+
+    const where = {
+      institucion_id: { in: institucionIds },
+    }
+
+    if (institucionId) {
+      if (!institucionIds.includes(institucionId)) {
+        return sendError(
+          res,
+          'No autorizado para ver estudiantes de esta institución',
+          403,
+        )
+      }
+
+      where.institucion_id = { in: [institucionId] }
+    }
+
+    if (search) {
+      where.OR = [
+        { nombre: { contains: search, mode: 'insensitive' } },
+        { apellido: { contains: search, mode: 'insensitive' } },
+        { documento: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ]
+    }
 
     const total = await prisma.estudiante.count({ where })
 
@@ -64,12 +84,23 @@ const obtenerEstudiante = async (req, res) => {
       return sendError(res, 'ID del estudiante es obligatorio', 400)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
     const estudiante = await prisma.estudiante.findUnique({
       where: { id },
     })
 
     if (!estudiante) {
       return sendError(res, 'Estudiante no encontrado', 404)
+    }
+
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para ver este estudiante', 403)
+    }
+
+    if (!institucionIds.includes(estudiante.institucion_id)) {
+      return sendError(res, 'No autorizado para ver este estudiante', 403)
     }
 
     return sendSuccess(
@@ -105,6 +136,17 @@ const crearEstudiante = async (req, res) => {
       return sendError(res, 'Institución no encontrada', 404)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
+    if (!institucionIds.includes(institucion_id)) {
+      return sendError(
+        res,
+        'No autorizado para crear estudiante en esta institución',
+        403,
+      )
+    }
+
     const nuevoEstudiante = await prisma.estudiante.create({
       data: {
         institucion_id,
@@ -137,12 +179,31 @@ const actualizarEstudiante = async (req, res) => {
       return sendError(res, 'ID del estudiante es obligatorio', 400)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
     const estudianteExistente = await prisma.estudiante.findUnique({
       where: { id },
     })
 
     if (!estudianteExistente) {
       return sendError(res, 'Estudiante no encontrado', 404)
+    }
+
+    if (institucionIds.length === 0) {
+      return sendError(
+        res,
+        'No autorizado para actualizar este estudiante',
+        403,
+      )
+    }
+
+    if (!institucionIds.includes(estudianteExistente.institucion_id)) {
+      return sendError(
+        res,
+        'No autorizado para actualizar este estudiante',
+        403,
+      )
     }
 
     if (institucion_id) {
@@ -152,6 +213,14 @@ const actualizarEstudiante = async (req, res) => {
 
       if (!institucion) {
         return sendError(res, 'Institución no encontrada', 404)
+      }
+
+      if (!institucionIds.includes(institucion_id)) {
+        return sendError(
+          res,
+          'No autorizado para mover estudiante a esta institución',
+          403,
+        )
       }
     }
 
@@ -187,12 +256,35 @@ const eliminarEstudiante = async (req, res) => {
       return sendError(res, 'ID del estudiante es obligatorio', 400)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
     const estudianteExistente = await prisma.estudiante.findUnique({
       where: { id },
     })
 
     if (!estudianteExistente) {
       return sendError(res, 'Estudiante no encontrado', 404)
+    }
+
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para eliminar este estudiante', 403)
+    }
+
+    if (!institucionIds.includes(estudianteExistente.institucion_id)) {
+      return sendError(res, 'No autorizado para eliminar este estudiante', 403)
+    }
+
+    const certificadosAsociados = await prisma.certificado.count({
+      where: { estudiante_id: id },
+    })
+
+    if (certificadosAsociados > 0) {
+      return sendError(
+        res,
+        'No se puede eliminar el estudiante porque tiene certificados asociados',
+        409,
+      )
     }
 
     await prisma.estudiante.delete({ where: { id } })

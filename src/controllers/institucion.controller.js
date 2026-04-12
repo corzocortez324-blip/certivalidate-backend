@@ -1,10 +1,19 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
+const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 
 // Listar instituciones
 const listarInstituciones = async (req, res) => {
   try {
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para ver instituciones', 403)
+    }
+
     const instituciones = await prisma.institucion.findMany({
+      where: { id: { in: institucionIds } },
       orderBy: { created_at: 'desc' },
     })
 
@@ -29,6 +38,9 @@ const obtenerInstitucion = async (req, res) => {
       return sendError(res, 'ID de la institución es obligatorio', 400)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
     const institucion = await prisma.institucion.findUnique({
       where: { id },
       include: {
@@ -39,6 +51,10 @@ const obtenerInstitucion = async (req, res) => {
 
     if (!institucion) {
       return sendError(res, 'Institución no encontrada', 404)
+    }
+
+    if (!institucionIds.includes(id)) {
+      return sendError(res, 'No autorizado para ver esta institución', 403)
     }
 
     return sendSuccess(
@@ -93,12 +109,23 @@ const actualizarInstitucion = async (req, res) => {
       return sendError(res, 'ID de la institución es obligatorio', 400)
     }
 
+    const usuarioId = req.usuario?.id
+    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+
     const institucionExistente = await prisma.institucion.findUnique({
       where: { id },
     })
 
     if (!institucionExistente) {
       return sendError(res, 'Institución no encontrada', 404)
+    }
+
+    if (!institucionIds.includes(id)) {
+      return sendError(
+        res,
+        'No autorizado para actualizar esta institución',
+        403,
+      )
     }
 
     const institucionActualizada = await prisma.institucion.update({

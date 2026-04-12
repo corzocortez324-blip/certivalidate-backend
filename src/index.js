@@ -67,6 +67,7 @@ const certificadoRoutes = require('./routes/certificado.routes')
 const estudianteRoutes = require('./routes/estudiante.routes')
 const institucionRoutes = require('./routes/institucion.routes')
 const plantillaRoutes = require('./routes/plantilla.routes')
+const auditoriaRoutes = require('./routes/auditoria.routes')
 
 app.use(limiterGeneral)
 app.use('/api/auth', limiterAuth, authRoutes)
@@ -75,6 +76,7 @@ app.use('/api/certificados', certificadoRoutes)
 app.use('/api/estudiantes', estudianteRoutes)
 app.use('/api/instituciones', institucionRoutes)
 app.use('/api/plantillas', plantillaRoutes)
+app.use('/api/auditoria', auditoriaRoutes)
 
 // Ruta de prueba/health check
 app.get('/health', (req, res) => {

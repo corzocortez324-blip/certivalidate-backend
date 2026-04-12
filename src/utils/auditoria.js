@@ -8,6 +8,13 @@ const registrarAuditoria = async (
   valores_despues,
   ip,
 ) => {
+  if (!usuario_id) {
+    console.warn(
+      'Advertencia de auditoría: usuario_id vacío, no se registrará auditoría.',
+    )
+    return
+  }
+
   try {
     await prisma.auditoria.create({
       data: {
