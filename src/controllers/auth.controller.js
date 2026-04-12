@@ -169,6 +169,141 @@ const refreshToken = async (req, res) => {
 }
 
 // Obtener perfil del usuario autenticado
+const actualizarPerfil = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id
+    const { nombre, apellido, email } = req.body
+
+    if (!nombre && !apellido && !email) {
+      return sendError(
+        res,
+        'Al menos un campo (nombre, apellido o email) es obligatorio',
+        400,
+      )
+    }
+
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { id: usuarioId },
+    })
+
+    if (!usuarioExistente) {
+      return sendError(res, 'Usuario no encontrado', 404)
+    }
+
+    if (email && email !== usuarioExistente.email) {
+      const usuarioEmail = await prisma.usuario.findUnique({
+        where: { email },
+      })
+      if (usuarioEmail) {
+        return sendError(res, 'El email ya está en uso', 409)
+      }
+    }
+
+    const valoresAntes = JSON.stringify({
+      nombre: usuarioExistente.nombre,
+      apellido: usuarioExistente.apellido,
+      email: usuarioExistente.email,
+    })
+
+    const usuarioActualizado = await prisma.usuario.update({
+      where: { id: usuarioId },
+      data: {
+        nombre: nombre || usuarioExistente.nombre,
+        apellido: apellido !== undefined ? apellido : usuarioExistente.apellido,
+        email: email || usuarioExistente.email,
+        updated_at: new Date(),
+      },
+    })
+
+    await registrarAuditoria(
+      prisma,
+      usuarioId,
+      'ACTUALIZAR_PERFIL',
+      'Usuario',
+      usuarioId,
+      valoresAntes,
+      JSON.stringify({
+        nombre: usuarioActualizado.nombre,
+        apellido: usuarioActualizado.apellido,
+        email: usuarioActualizado.email,
+      }),
+      req.ip ||
+        req.headers['x-forwarded-for'] ||
+        req.connection?.remoteAddress ||
+        null,
+    )
+
+    const { password_hash: _, ...usuarioSinPassword } = usuarioActualizado
+
+    return sendSuccess(
+      res,
+      usuarioSinPassword,
+      'Perfil actualizado correctamente',
+      200,
+    )
+  } catch (error) {
+    console.error('Error en actualizarPerfil:', error)
+    return sendError(res, 'Error al actualizar perfil', 500)
+  }
+}
+
+const cambiarPassword = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id
+    const { currentPassword, newPassword } = req.body
+
+    if (!currentPassword || !newPassword) {
+      return sendError(res, 'Contraseña actual y nueva son obligatorias', 400)
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: usuarioId },
+    })
+
+    if (!usuario) {
+      return sendError(res, 'Usuario no encontrado', 404)
+    }
+
+    const passwordValida = await bcrypt.compare(
+      currentPassword,
+      usuario.password_hash,
+    )
+
+    if (!passwordValida) {
+      return sendError(res, 'Contraseña actual incorrecta', 401)
+    }
+
+    const nuevoHash = await bcrypt.hash(newPassword, 10)
+
+    await prisma.usuario.update({
+      where: { id: usuarioId },
+      data: {
+        password_hash: nuevoHash,
+        updated_at: new Date(),
+      },
+    })
+
+    await registrarAuditoria(
+      prisma,
+      usuarioId,
+      'CAMBIAR_PASSWORD',
+      'Usuario',
+      usuarioId,
+      null,
+      null,
+      req.ip ||
+        req.headers['x-forwarded-for'] ||
+        req.connection?.remoteAddress ||
+        null,
+    )
+
+    return sendSuccess(res, null, 'Contraseña actualizada correctamente', 200)
+  } catch (error) {
+    console.error('Error en cambiarPassword:', error)
+    return sendError(res, 'Error al cambiar contraseña', 500)
+  }
+}
+
 const obtenerPerfil = async (req, res) => {
   try {
     const usuario = await prisma.usuario.findUnique({
@@ -193,4 +328,11 @@ const obtenerPerfil = async (req, res) => {
   }
 }
 
-module.exports = { register, login, refreshToken, obtenerPerfil }
+module.exports = {
+  register,
+  login,
+  refreshToken,
+  obtenerPerfil,
+  actualizarPerfil,
+  cambiarPassword,
+}

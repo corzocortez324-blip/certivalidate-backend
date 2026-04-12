@@ -32,6 +32,38 @@ const validateLogin = [
   body('password').notEmpty().withMessage('La contraseña es obligatoria'),
 ]
 
+const validateUpdateProfile = [
+  body('nombre')
+    .optional()
+    .trim()
+    .isLength({ min: 3 })
+    .withMessage('El nombre debe tener al menos 3 caracteres'),
+  body('apellido')
+    .optional()
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('El apellido no puede estar vacío'),
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('Debe ser un email válido')
+    .normalizeEmail(),
+]
+
+const validateChangePassword = [
+  body('currentPassword')
+    .notEmpty()
+    .withMessage('La contraseña actual es obligatoria'),
+  body('newPassword')
+    .isLength({ min: 6 })
+    .withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage(
+      'La nueva contraseña debe contener mayúscula, minúscula y número',
+    ),
+]
+
 const validateCertificado = [
   body('estudiante_id')
     .trim()
