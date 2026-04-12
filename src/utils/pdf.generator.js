@@ -12,91 +12,124 @@ const generarPDF = (certificado, res) => {
       margin: 50,
     })
 
-    // Headers para descarga
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=certificado_${certificado.id}_${certificado.estudiante.replace(/\s+/g, '_')}.pdf`,
-    )
-
-    doc.pipe(res)
-
-    // CONTENIDO DEL PDF
-    // Título
-    doc
-      .fontSize(32)
-      .font('Helvetica-Bold')
-      .text('CERTIFICADO', { align: 'center' })
-
-    doc.moveDown(0.5)
-    doc.fontSize(12).font('Helvetica').text('─'.repeat(80), { align: 'center' })
-
-    doc.moveDown(1)
-
-    // Contenido del certificado
-    doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text('Se certifica que:', { indent: 50 })
-
-    doc.moveDown(0.5)
-    doc
-      .fontSize(16)
-      .font('Helvetica-Bold')
-      .text(certificado.estudiante.toUpperCase(), { align: 'center' })
-
-    doc.moveDown(1)
-    doc
-      .fontSize(12)
-      .font('Helvetica')
-      .text('Ha completado satisfactoriamente el curso:', { indent: 50 })
-
-    doc.moveDown(0.5)
-    doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text(certificado.curso.toUpperCase(), { align: 'center' })
-
-    doc.moveDown(1.5)
-
-    // Fecha
-    const fecha = new Date(certificado.fechaEmision)
+    const estudianteNombre =
+      `${certificado.estudiante?.nombre || ''} ${certificado.estudiante?.apellido || ''}`.trim()
+    const plantillaNombre =
+      certificado.plantilla?.nombre || 'Plantilla no disponible'
+    const institucionNombre =
+      certificado.institucion?.nombre || 'Institución no disponible'
+    const fecha = certificado.fecha_emision
+      ? new Date(certificado.fecha_emision)
+      : new Date()
     const fechaFormato = fecha.toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     })
+    const hashTruncado = certificado.hash_sha256
+      ? `${certificado.hash_sha256.substring(0, 16)}...`
+      : 'N/A'
+    const codigoUnico = certificado.codigo_unico || 'N/A'
 
+    const filename = `certificado_${certificado.id}_${estudianteNombre.replace(/\s+/g, '_')}.pdf`
+
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`)
+
+    doc.pipe(res)
+
+    doc
+      .fontSize(28)
+      .font('Helvetica-Bold')
+      .fillColor('#1f2937')
+      .text('CERTIFICADO DE LOGRO', { align: 'center' })
+
+    doc.moveDown(0.5)
+    doc
+      .fontSize(12)
+      .font('Helvetica')
+      .fillColor('#4b5563')
+      .text(`Emitido por ${institucionNombre}`, { align: 'center' })
+
+    doc.moveDown(1)
+    doc
+      .fontSize(12)
+      .font('Helvetica')
+      .text('Se certifica que:', { align: 'left' })
+
+    doc.moveDown(0.5)
+    doc
+      .fontSize(22)
+      .font('Helvetica-Bold')
+      .fillColor('#111827')
+      .text(estudianteNombre, { align: 'center' })
+
+    doc.moveDown(1)
+    doc
+      .fontSize(12)
+      .font('Helvetica')
+      .fillColor('#374151')
+      .text('Ha completado satisfactoriamente el programa:', { align: 'left' })
+
+    doc.moveDown(0.5)
+    doc
+      .fontSize(18)
+      .font('Helvetica-Bold')
+      .fillColor('#111827')
+      .text(plantillaNombre, { align: 'center' })
+
+    doc.moveDown(1.5)
     doc
       .fontSize(11)
       .font('Helvetica')
-      .text(`Fecha de emisión: ${fechaFormato}`, { indent: 50 })
+      .fillColor('#374151')
+      .text(`Fecha de emisión: ${fechaFormato}`, { align: 'left' })
 
-    doc.moveDown(1)
+    doc.moveDown(0.5)
+    doc
+      .fontSize(11)
+      .font('Helvetica')
+      .fillColor('#374151')
+      .text(`Código único: ${codigoUnico}`, { align: 'left' })
 
-    // Hash para verificación
+    doc.moveDown(0.5)
+    doc
+      .fontSize(11)
+      .font('Helvetica')
+      .fillColor('#374151')
+      .text(`Hash SHA256: ${hashTruncado}`, { align: 'left' })
+
+    doc.moveDown(2)
     doc
       .fontSize(10)
-      .font('Helvetica')
-      .text(`Código de verificación: ${certificado.hash.substring(0, 16)}...`, {
-        indent: 50,
-      })
-
-    doc.moveDown(2)
-    doc
-      .fontSize(9)
       .font('Helvetica-Oblique')
+      .fillColor('#6b7280')
       .text(
-        'Este certificado se puede verificar en el sistema CertiValidate utilizando el código de verificación.',
-        { align: 'center', width: 500 },
+        'Verifica este certificado en el sistema CertiValidate proporcionando el código único o el hash SHA256 completo.',
+        {
+          align: 'center',
+          width: 480,
+        },
       )
 
-    // Footer
-    doc.moveDown(2)
-    doc.fontSize(8).font('Helvetica').text('─'.repeat(80), { align: 'center' })
+    doc.moveDown(1)
     doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor('#6b7280')
+      .text(
+        'Para validación oficial, visita: https://tu-dominio-certivalidate.com/verificar',
+        {
+          align: 'center',
+          width: 480,
+        },
+      )
+
+    doc.moveDown(2)
+    doc
+      .fillColor('#9ca3af')
       .fontSize(8)
-      .text('CertiValidate © 2024 - Sistema de Validación de Certificados', {
+      .text('CertiValidate © 2026 - Todos los derechos reservados', {
         align: 'center',
       })
 

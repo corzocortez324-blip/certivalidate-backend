@@ -8,6 +8,7 @@ const {
   descargarCertificado,
   listarCertificados,
   obtenerCertificado,
+  revocarCertificado,
 } = require('../controllers/certificado.controller')
 const {
   validateCertificado,
@@ -25,6 +26,7 @@ router.post(
 router.get('/listar', verificarToken, listarCertificados)
 router.get('/descargar/:id', verificarToken, descargarCertificado)
 router.get('/:id', verificarToken, obtenerCertificado)
+router.post('/:id/revocar', verificarToken, revocarCertificado)
 
 // Rutas públicas
 router.post('/verificar', verificarCertificado)

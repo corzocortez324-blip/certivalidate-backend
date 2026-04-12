@@ -33,18 +33,24 @@ const validateLogin = [
 ]
 
 const validateCertificado = [
-  body('estudiante')
+  body('estudiante_id')
     .trim()
     .notEmpty()
-    .withMessage('El nombre del estudiante es obligatorio')
-    .isLength({ min: 3 })
-    .withMessage('El nombre debe tener al menos 3 caracteres'),
-  body('curso')
+    .withMessage('estudiante_id es obligatorio')
+    .isUUID()
+    .withMessage('estudiante_id debe ser un UUID válido'),
+  body('institucion_id')
     .trim()
     .notEmpty()
-    .withMessage('El nombre del curso es obligatorio')
-    .isLength({ min: 3 })
-    .withMessage('El curso debe tener al menos 3 caracteres'),
+    .withMessage('institucion_id es obligatorio')
+    .isUUID()
+    .withMessage('institucion_id debe ser un UUID válido'),
+  body('plantilla_id')
+    .trim()
+    .notEmpty()
+    .withMessage('plantilla_id es obligatorio')
+    .isUUID()
+    .withMessage('plantilla_id debe ser un UUID válido'),
 ]
 
 // Middleware para manejar errores de validación

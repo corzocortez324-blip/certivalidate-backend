@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const morgan = require('morgan')
+const rateLimit = require('express-rate-limit')
 const { sendSuccess, sendError } = require('./utils/response.utils')
 
 const app = express()
@@ -22,12 +23,58 @@ app.use(
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
+const limiterGeneral = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    statusCode: 429,
+    message: 'Demasiadas solicitudes, inténtalo de nuevo más tarde',
+  },
+})
+
+const limiterAuth = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    statusCode: 429,
+    message:
+      'Demasiadas solicitudes de autenticación, inténtalo de nuevo más tarde',
+  },
+})
+
+const limiterVerificacion = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    statusCode: 429,
+    message:
+      'Demasiadas solicitudes de verificación, inténtalo de nuevo más tarde',
+  },
+})
+
 // Rutas
 const authRoutes = require('./routes/auth.routes')
 const certificadoRoutes = require('./routes/certificado.routes')
+const estudianteRoutes = require('./routes/estudiante.routes')
+const institucionRoutes = require('./routes/institucion.routes')
+const plantillaRoutes = require('./routes/plantilla.routes')
 
-app.use('/api/auth', authRoutes)
+app.use(limiterGeneral)
+app.use('/api/auth', limiterAuth, authRoutes)
+app.use('/api/certificados/verificar', limiterVerificacion)
 app.use('/api/certificados', certificadoRoutes)
+app.use('/api/estudiantes', estudianteRoutes)
+app.use('/api/instituciones', institucionRoutes)
+app.use('/api/plantillas', plantillaRoutes)
 
 // Ruta de prueba/health check
 app.get('/health', (req, res) => {

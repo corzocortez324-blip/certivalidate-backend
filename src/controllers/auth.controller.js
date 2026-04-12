@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
+const { registrarAuditoria } = require('../utils/auditoria')
 
 // REGISTER
 const register = async (req, res) => {
@@ -13,7 +14,7 @@ const register = async (req, res) => {
     }
 
     const usuarioExistente = await prisma.usuario.findUnique({
-      where: { email }
+      where: { email },
     })
 
     if (usuarioExistente) {
@@ -28,8 +29,22 @@ const register = async (req, res) => {
         apellido: apellido || '', // Por ahora lo dejamos vacío si no lo envían
         email,
         password_hash: hash,
-      }
+      },
     })
+
+    await registrarAuditoria(
+      prisma,
+      nuevoUsuario.id,
+      'CREAR_USUARIO',
+      'Usuario',
+      nuevoUsuario.id,
+      null,
+      JSON.stringify({ nombre, apellido: apellido || '', email }),
+      req.ip ||
+        req.headers['x-forwarded-for'] ||
+        req.connection?.remoteAddress ||
+        null,
+    )
 
     const { password_hash: _, ...usuarioSinPassword } = nuevoUsuario
 
@@ -55,7 +70,7 @@ const login = async (req, res) => {
     }
 
     const usuario = await prisma.usuario.findUnique({
-      where: { email }
+      where: { email },
     })
 
     if (!usuario) {
@@ -68,16 +83,28 @@ const login = async (req, res) => {
       return sendError(res, 'Credenciales inválidas', 401)
     }
 
+    await prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { ultimo_acceso: new Date() },
+    })
+
     const token = jwt.sign(
       { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
       process.env.JWT_SECRET || 'secreto123',
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
     )
 
+    const refreshToken = jwt.sign(
+      { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
+      process.env.JWT_REFRESH_SECRET || 'refreshsecreto123',
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' },
+    )
+
     return sendSuccess(
       res,
       {
         token,
+        refreshToken,
         usuario: {
           id: usuario.id,
           nombre: usuario.nombre,
@@ -93,11 +120,59 @@ const login = async (req, res) => {
   }
 }
 
+// Refresh token
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body
+
+    if (!refreshToken) {
+      return sendError(res, 'Refresh token es obligatorio', 400)
+    }
+
+    let decoded
+    try {
+      decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_REFRESH_SECRET || 'refreshsecreto123',
+      )
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        return sendError(res, 'Refresh token expirado', 401)
+      }
+      return sendError(res, 'Refresh token inválido', 401)
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: decoded.id },
+    })
+
+    if (!usuario) {
+      return sendError(res, 'Usuario no encontrado', 404)
+    }
+
+    const newToken = jwt.sign(
+      { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
+      process.env.JWT_SECRET || 'secreto123',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+    )
+
+    return sendSuccess(
+      res,
+      { token: newToken },
+      'Access token renovado correctamente',
+      200,
+    )
+  } catch (error) {
+    console.error('Error en refreshToken:', error)
+    return sendError(res, 'Error al renovar token', 500)
+  }
+}
+
 // Obtener perfil del usuario autenticado
 const obtenerPerfil = async (req, res) => {
   try {
     const usuario = await prisma.usuario.findUnique({
-      where: { id: req.usuario.id }
+      where: { id: req.usuario.id },
     })
 
     if (!usuario) {
@@ -118,4 +193,4 @@ const obtenerPerfil = async (req, res) => {
   }
 }
 
-module.exports = { register, login, obtenerPerfil }
+module.exports = { register, login, refreshToken, obtenerPerfil }
