@@ -105,4 +105,6 @@ module.exports = {
   validateLogin,
   validateCertificado,
   handleValidationErrors,
+  validateUpdateProfile,
+  validateChangePassword,
 }

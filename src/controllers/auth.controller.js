@@ -26,9 +26,10 @@ const register = async (req, res) => {
     const nuevoUsuario = await prisma.usuario.create({
       data: {
         nombre,
-        apellido: apellido || '', // Por ahora lo dejamos vacío si no lo envían
+        apellido: apellido || '',
         email,
         password_hash: hash,
+        rol: 'usuario',
       },
     })
 
@@ -77,6 +78,10 @@ const login = async (req, res) => {
       return sendError(res, 'Credenciales inválidas', 401)
     }
 
+    if (usuario.activo === false) {
+      return sendError(res, 'Usuario desactivado', 403)
+    }
+
     const passwordValida = await bcrypt.compare(password, usuario.password_hash)
 
     if (!passwordValida) {
@@ -88,15 +93,29 @@ const login = async (req, res) => {
       data: { ultimo_acceso: new Date() },
     })
 
+    if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+      throw new Error('JWT secrets no están configurados')
+    }
+
     const token = jwt.sign(
-      { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
-      process.env.JWT_SECRET || 'secreto123',
+      {
+        id: usuario.id,
+        email: usuario.email,
+        nombre: usuario.nombre,
+        rol: usuario.rol,
+      },
+      process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
     )
 
     const refreshToken = jwt.sign(
-      { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
-      process.env.JWT_REFRESH_SECRET || 'refreshsecreto123',
+      {
+        id: usuario.id,
+        email: usuario.email,
+        nombre: usuario.nombre,
+        rol: usuario.rol, // 👈 también aquí
+      },
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' },
     )
 
@@ -131,10 +150,7 @@ const refreshToken = async (req, res) => {
 
     let decoded
     try {
-      decoded = jwt.verify(
-        refreshToken,
-        process.env.JWT_REFRESH_SECRET || 'refreshsecreto123',
-      )
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET)
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
         return sendError(res, 'Refresh token expirado', 401)
@@ -151,8 +167,13 @@ const refreshToken = async (req, res) => {
     }
 
     const newToken = jwt.sign(
-      { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
-      process.env.JWT_SECRET || 'secreto123',
+      {
+        id: usuario.id,
+        email: usuario.email,
+        nombre: usuario.nombre,
+        rol: usuario.rol, // 👈 IMPORTANTE
+      },
+      process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
     )
 

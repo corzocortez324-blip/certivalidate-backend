@@ -186,9 +186,21 @@ const verificarCertificado = async (req, res) => {
     return sendSuccess(
       res,
       {
-        ...cert,
+        codigo_unico: cert.codigo_unico,
         estado: resultado === 'valido' ? cert.estado : resultado,
         mensaje,
+        fecha_emision: cert.fecha_emision,
+        fecha_expiracion: cert.fecha_expiracion,
+        estudiante: {
+          nombre: cert.estudiante?.nombre,
+          apellido: cert.estudiante?.apellido,
+        },
+        institucion: {
+          nombre: cert.institucion?.nombre,
+        },
+        plantilla: {
+          nombre: cert.plantilla?.nombre,
+        },
       },
       'Certificado verificado correctamente',
       200,
