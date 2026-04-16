@@ -1,5 +1,3 @@
 node_modules/
 .env
 /src/generated/prisma
- prisma/seed.js
-src/utils/roles.js
