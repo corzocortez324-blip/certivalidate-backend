@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
+const { getClientIp } = require('../utils/validators')
 
 // REGISTER
 const register = async (req, res) => {
@@ -29,7 +30,6 @@ const register = async (req, res) => {
         apellido: apellido || '',
         email,
         password_hash: hash,
-        rol: 'usuario',
       },
     })
 
@@ -41,10 +41,7 @@ const register = async (req, res) => {
       nuevoUsuario.id,
       null,
       JSON.stringify({ nombre, apellido: apellido || '', email }),
-      req.ip ||
-        req.headers['x-forwarded-for'] ||
-        req.connection?.remoteAddress ||
-        null,
+      getClientIp(req),
     )
 
     const { password_hash: _, ...usuarioSinPassword } = nuevoUsuario
@@ -102,7 +99,6 @@ const login = async (req, res) => {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,
-        rol: usuario.rol,
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
@@ -113,7 +109,6 @@ const login = async (req, res) => {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,
-        rol: usuario.rol, // 👈 también aquí
       },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' },
@@ -171,7 +166,6 @@ const refreshToken = async (req, res) => {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,
-        rol: usuario.rol, // 👈 IMPORTANTE
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
@@ -248,10 +242,7 @@ const actualizarPerfil = async (req, res) => {
         apellido: usuarioActualizado.apellido,
         email: usuarioActualizado.email,
       }),
-      req.ip ||
-        req.headers['x-forwarded-for'] ||
-        req.connection?.remoteAddress ||
-        null,
+      getClientIp(req),
     )
 
     const { password_hash: _, ...usuarioSinPassword } = usuarioActualizado
@@ -312,10 +303,7 @@ const cambiarPassword = async (req, res) => {
       usuarioId,
       null,
       null,
-      req.ip ||
-        req.headers['x-forwarded-for'] ||
-        req.connection?.remoteAddress ||
-        null,
+      getClientIp(req),
     )
 
     return sendSuccess(res, null, 'Contraseña actualizada correctamente', 200)

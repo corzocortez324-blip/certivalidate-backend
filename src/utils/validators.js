@@ -85,6 +85,12 @@ const validateCertificado = [
     .withMessage('plantilla_id debe ser un UUID válido'),
 ]
 
+const getClientIp = (req) =>
+  req.ip ||
+  req.headers['x-forwarded-for'] ||
+  req.connection?.remoteAddress ||
+  null
+
 // Middleware para manejar errores de validación
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req)
@@ -107,4 +113,5 @@ module.exports = {
   handleValidationErrors,
   validateUpdateProfile,
   validateChangePassword,
+  getClientIp,
 }

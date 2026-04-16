@@ -45,11 +45,13 @@ model UsuarioInstitucion {
   institucion    Institucion @relation(fields: [institucion_id], references: [id])
   rol            Rol         @relation(fields: [rol_id], references: [id])
   usuario        Usuario     @relation(fields: [usuario_id], references: [id])
+
+  @@unique([usuario_id, institucion_id])
 }
 
 model Rol {
   id          String               @id @default(uuid())
-  nombre      String
+  nombre      String               @unique
   descripcion String?
   permisos    RolPermiso[]
   usuarios    UsuarioInstitucion[]
@@ -60,6 +62,8 @@ model Permiso {
   recurso String
   accion  String
   roles   RolPermiso[]
+
+  @@unique([recurso, accion])
 }
 
 model RolPermiso {

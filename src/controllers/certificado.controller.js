@@ -4,6 +4,7 @@ const generarPDF = require('../utils/pdf.generator')
 const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { obtenerInstitucionesUsuario } = require('../utils/authorization')
+const { getClientIp } = require('../utils/validators')
 
 // Crear certificado
 const emitirCertificado = async (req, res) => {
@@ -74,36 +75,38 @@ const emitirCertificado = async (req, res) => {
       .update(contenidoReal)
       .digest('hex')
 
-    const certificado = await prisma.certificado.create({
-      data: {
-        estudiante_id,
-        institucion_id,
-        plantilla_id,
-        codigo_unico,
-        estado: 'válido',
-        fecha_emision: fechaEmision,
-        hash_sha256,
-      },
-    })
+    const certificado = await prisma.$transaction(async (tx) => {
+      const cert = await tx.certificado.create({
+        data: {
+          estudiante_id,
+          institucion_id,
+          plantilla_id,
+          codigo_unico,
+          estado: 'valido',
+          fecha_emision: fechaEmision,
+          hash_sha256,
+        },
+      })
 
-    await registrarAuditoria(
-      prisma,
-      req.usuario?.id || '',
-      'EMITIR_CERTIFICADO',
-      'Certificado',
-      certificado.id,
-      null,
-      JSON.stringify({
-        estudiante_id,
-        institucion_id,
-        plantilla_id,
-        codigo_unico,
-      }),
-      req.ip ||
-        req.headers['x-forwarded-for'] ||
-        req.connection?.remoteAddress ||
-        null,
-    )
+      await tx.auditoria.create({
+        data: {
+          usuario_id: req.usuario?.id || '',
+          accion: 'EMITIR_CERTIFICADO',
+          entidad: 'Certificado',
+          entidad_id: cert.id,
+          valores_antes: null,
+          valores_despues: JSON.stringify({
+            estudiante_id,
+            institucion_id,
+            plantilla_id,
+            codigo_unico,
+          }),
+          ip: getClientIp(req),
+        },
+      })
+
+      return cert
+    })
 
     return sendSuccess(
       res,
@@ -153,11 +156,7 @@ const verificarCertificado = async (req, res) => {
       )
     }
 
-    const ip =
-      req.ip ||
-      req.headers['x-forwarded-for'] ||
-      req.connection?.remoteAddress ||
-      null
+    const ip = getClientIp(req)
     const userAgent = req.headers['user-agent'] || null
 
     const ahora = new Date()
@@ -313,7 +312,7 @@ const listarCertificados = async (req, res) => {
     if (estadoFiltro === 'revocado') {
       where.estado = 'revocado'
     } else if (estadoFiltro === 'emitido') {
-      where.estado = 'válido'
+      where.estado = 'valido'
     } else if (estadoFiltro === 'expirado') {
       where.fecha_expiracion = { lt: new Date() }
     }
@@ -583,28 +582,25 @@ const revocarCertificado = async (req, res) => {
       return sendError(res, 'El certificado ya está revocado', 409)
     }
 
-    const certificadoActualizado = await prisma.certificado.update({
-      where: { id },
-      data: {
-        estado: 'revocado',
-      },
-    })
+    const [certificadoActualizado] = await prisma.$transaction([
+      prisma.certificado.update({
+        where: { id },
+        data: {
+          estado: 'revocado',
+        },
+      }),
+      prisma.revocacion.create({
+        data: {
+          certificado_id: id,
+          revocado_por: req.usuario?.id || '',
+          motivo_codigo,
+          motivo_detalle: motivo_detalle || null,
+          fecha_revocacion: new Date(),
+        },
+      }),
+    ])
 
-    await prisma.revocacion.create({
-      data: {
-        certificado_id: id,
-        revocado_por: req.usuario?.id || '',
-        motivo_codigo,
-        motivo_detalle: motivo_detalle || null,
-        fecha_revocacion: new Date(),
-      },
-    })
-
-    const ip =
-      req.ip ||
-      req.headers['x-forwarded-for'] ||
-      req.connection?.remoteAddress ||
-      null
+    const ip = getClientIp(req)
 
     await registrarAuditoria(
       prisma,

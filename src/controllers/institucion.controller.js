@@ -1,6 +1,7 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
 const { obtenerInstitucionesUsuario } = require('../utils/authorization')
+const { getRolByNombre } = require('../utils/roles')
 
 // Listar instituciones
 const listarInstituciones = async (req, res) => {
@@ -78,13 +79,27 @@ const crearInstitucion = async (req, res) => {
       return sendError(res, 'El nombre de la institución es obligatorio', 400)
     }
 
-    const nuevaInstitucion = await prisma.institucion.create({
-      data: {
-        nombre,
-        dominio: dominio || null,
-        logo_url: logo_url || null,
-        activa: typeof activa === 'boolean' ? activa : true,
-      },
+    const rolAdmin = await getRolByNombre('admin')
+
+    const nuevaInstitucion = await prisma.$transaction(async (tx) => {
+      const inst = await tx.institucion.create({
+        data: {
+          nombre,
+          dominio: dominio || null,
+          logo_url: logo_url || null,
+          activa: typeof activa === 'boolean' ? activa : true,
+        },
+      })
+
+      await tx.usuarioInstitucion.create({
+        data: {
+          usuario_id: req.usuario.id,
+          institucion_id: inst.id,
+          rol_id: rolAdmin.id,
+        },
+      })
+
+      return inst
     })
 
     return sendSuccess(
@@ -250,7 +265,7 @@ const obtenerEstadisticasInstitucion = async (req, res) => {
       prisma.certificado.count({
         where: {
           institucion_id: id,
-          estado: 'válido',
+          estado: 'valido',
           deleted_at: null,
         },
       }),

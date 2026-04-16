@@ -34,6 +34,7 @@ router.put(
   verificarToken,
   validateChangePassword,
   handleValidationErrors,
+  validateUpdateProfile,
   cambiarPassword,
 )
 

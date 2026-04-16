@@ -1,14 +1,28 @@
 require('dotenv').config()
+
+// Validacion de variables de entorno criticas
+const REQUIRED_ENV = ['JWT_SECRET', 'JWT_REFRESH_SECRET']
+const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key])
+if (missingEnv.length > 0) {
+  console.error(`[FATAL] Variables de entorno faltantes: ${missingEnv.join(', ')}`)
+  process.exit(1)
+}
+
 const express = require('express')
+const helmet = require('helmet')
 const cors = require('cors')
 const morgan = require('morgan')
 const rateLimit = require('express-rate-limit')
 const { sendSuccess, sendError } = require('./utils/response.utils')
+const prisma = require('./utils/prisma')
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
+app.set('trust proxy', 1)
+
 // Middlewares globales
+app.use(helmet())
 app.use(morgan('combined'))
 
 app.use(
@@ -120,12 +134,29 @@ app.use((err, req, res, next) => {
 })
 
 // Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`
+async function main() {
+  await prisma.$connect()
+  app.listen(PORT, () => {
+    console.log(`
 
-   CertiValidate API v1.0.0             
-   Servidor corriendo en puerto ${PORT}  
-   URL: http://localhost:${PORT}         
-   Ambiente: ${process.env.NODE_ENV || 'development'} 
-  `)
+   CertiValidate API v1.0.0
+   Servidor corriendo en puerto ${PORT}
+   URL: http://localhost:${PORT}
+   Ambiente: ${process.env.NODE_ENV || 'development'}
+    `)
+  })
+}
+
+async function shutdown(signal) {
+  console.log(`[${signal}] Cerrando servidor...`)
+  await prisma.$disconnect()
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))
+
+main().catch((err) => {
+  console.error('[FATAL] Error al iniciar el servidor:', err)
+  process.exit(1)
 })
