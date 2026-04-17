@@ -1,0 +1,61 @@
+const jwt = require('jsonwebtoken')
+const prisma = require('../utils/prisma')
+const { sendError } = require('../utils/response.utils')
+const { getEnv } = require('../utils/env')
+
+const verificarToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization
+
+    if (!authHeader) {
+      return sendError(res, 'Token requerido', 401)
+    }
+
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : authHeader
+
+    if (!token) {
+      return sendError(res, 'Token inválido o malformado', 401)
+    }
+
+    const decoded = jwt.verify(token, getEnv('JWT_SECRET'))
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        activo: true,
+        deleted_at: true,
+      },
+    })
+
+    if (!usuario || usuario.deleted_at) {
+      return sendError(res, 'Usuario no encontrado', 401)
+    }
+
+    if (!usuario.activo) {
+      return sendError(res, 'Usuario desactivado', 403)
+    }
+
+    req.usuario = {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      email: usuario.email,
+    }
+
+    next()
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return sendError(res, 'Token expirado', 401)
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return sendError(res, 'Token inválido', 401)
+    }
+    console.error('Error de autenticación:', error)
+    return sendError(res, 'Error de autenticación', 401)
+  }
+}
+
+module.exports = verificarToken
