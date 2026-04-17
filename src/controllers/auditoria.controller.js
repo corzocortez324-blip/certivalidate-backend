@@ -1,10 +1,7 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
-const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 
-const construirFiltroAuditoriaAutorizada = async (usuarioId) => {
-  const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
-
+const construirFiltroAuditoriaAutorizada = async (usuarioId, institucionIds) => {
   if (institucionIds.length === 0) {
     return null
   }
@@ -50,6 +47,7 @@ const listarAuditoria = async (req, res) => {
 
     const filtroAutorizado = await construirFiltroAuditoriaAutorizada(
       req.usuario?.id,
+      req.institucionIds,
     )
 
     if (!filtroAutorizado) {
@@ -126,6 +124,7 @@ const obtenerAuditoriaPorEntidad = async (req, res) => {
 
     const filtroAutorizado = await construirFiltroAuditoriaAutorizada(
       req.usuario?.id,
+      req.institucionIds,
     )
 
     if (!filtroAutorizado) {

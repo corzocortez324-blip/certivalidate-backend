@@ -3,7 +3,6 @@ const { sendSuccess, sendError } = require('../utils/response.utils')
 const generarPDF = require('../utils/pdf.generator')
 const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
-const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 const { getClientIp } = require('../utils/validators')
 
 // Crear certificado
@@ -57,8 +56,7 @@ const emitirCertificado = async (req, res) => {
       )
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
     if (!institucionIds.includes(institucion_id)) {
       return sendError(
         res,
@@ -232,8 +230,7 @@ const descargarCertificado = async (req, res) => {
       return sendError(res, 'Certificado no encontrado', 404)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(
@@ -262,7 +259,6 @@ const descargarCertificado = async (req, res) => {
 // Listar certificados
 const listarCertificados = async (req, res) => {
   try {
-    const usuarioId = req.usuario?.id
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(
       Math.max(parseInt(req.query.limit, 10) || 10, 1),
@@ -270,15 +266,7 @@ const listarCertificados = async (req, res) => {
     )
     const estadoFiltro = req.query.estado
 
-    const usuarioConInstituciones = await prisma.usuario.findUnique({
-      where: { id: usuarioId },
-      include: {
-        instituciones: true,
-      },
-    })
-
-    const instIds =
-      usuarioConInstituciones?.instituciones.map((i) => i.institucion_id) || []
+    const instIds = req.institucionIds
 
     const search = (req.query.search || '').trim()
     const institucionId = req.query.institucion_id
@@ -386,8 +374,7 @@ const obtenerCertificado = async (req, res) => {
       return sendError(res, 'Certificado no encontrado', 404)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(res, 'No autorizado para ver este certificado', 403)
@@ -485,8 +472,7 @@ const obtenerRevocaciones = async (req, res) => {
       return sendError(res, 'Certificado no encontrado', 404)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(
@@ -567,8 +553,7 @@ const revocarCertificado = async (req, res) => {
       return sendError(res, 'Certificado no encontrado', 404)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(res, 'No autorizado para revocar este certificado', 403)

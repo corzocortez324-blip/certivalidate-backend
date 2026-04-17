@@ -1,6 +1,5 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
-const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 
 // Listar estudiantes con paginación
 const listarEstudiantes = async (req, res) => {
@@ -10,9 +9,8 @@ const listarEstudiantes = async (req, res) => {
       Math.max(parseInt(req.query.limit, 10) || 10, 1),
       100,
     )
-    const usuarioId = req.usuario?.id
 
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const search = (req.query.search || '').trim()
     const institucionId = req.query.institucion_id
@@ -84,8 +82,7 @@ const obtenerEstudiante = async (req, res) => {
       return sendError(res, 'ID del estudiante es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const estudiante = await prisma.estudiante.findUnique({
       where: { id },
@@ -136,8 +133,7 @@ const crearEstudiante = async (req, res) => {
       return sendError(res, 'Institución no encontrada', 404)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (!institucionIds.includes(institucion_id)) {
       return sendError(
@@ -179,8 +175,7 @@ const actualizarEstudiante = async (req, res) => {
       return sendError(res, 'ID del estudiante es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const estudianteExistente = await prisma.estudiante.findUnique({
       where: { id },
@@ -256,8 +251,7 @@ const eliminarEstudiante = async (req, res) => {
       return sendError(res, 'ID del estudiante es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const estudianteExistente = await prisma.estudiante.findUnique({
       where: { id },

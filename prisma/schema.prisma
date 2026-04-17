@@ -31,9 +31,10 @@ model Usuario {
   created_at    DateTime             @default(now())
   updated_at    DateTime?
   deleted_at    DateTime?
-  auditorias    Auditoria[]
-  revocaciones  Revocacion[]
-  instituciones UsuarioInstitucion[]
+  auditorias     Auditoria[]
+  revocaciones   Revocacion[]
+  instituciones  UsuarioInstitucion[]
+  refreshTokens  RefreshToken[]
 }
 
 model UsuarioInstitucion {
@@ -177,6 +178,18 @@ model BlockchainTransaccion {
   created_at     DateTime    @default(now())
   confirmado_en  DateTime?
   certificado    Certificado @relation(fields: [certificado_id], references: [id])
+}
+
+model RefreshToken {
+  id            String    @id @default(uuid())
+  usuario_id    String
+  token_hash    String    @unique
+  expires_at    DateTime
+  revoked_at    DateTime?
+  created_by_ip String?
+  user_agent    String?
+  created_at    DateTime  @default(now())
+  usuario       Usuario   @relation(fields: [usuario_id], references: [id])
 }
 
 model Auditoria {

@@ -9,17 +9,18 @@ const {
   actualizarEstudiante,
   eliminarEstudiante,
 } = require('../controllers/estudiante.controller')
-const { requirePermission } = require('../utils/authorization')
+const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
 const {
   validateEstudiante,
   validateUUIDParam,
   handleValidationErrors,
 } = require('../utils/validators')
 
-router.get('/', verificarToken, requirePermission('estudiante', 'listar'), listarEstudiantes)
+router.get('/', verificarToken, cargarInstitucionesUsuario, requirePermission('estudiante', 'listar'), listarEstudiantes)
 router.get(
   '/:id',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('estudiante', 'ver'),
   validateUUIDParam('id'),
   handleValidationErrors,
@@ -28,6 +29,7 @@ router.get(
 router.post(
   '/',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('estudiante', 'crear', {
     institucionIdResolver: (req) => req.body.institucion_id,
   }),
@@ -38,6 +40,7 @@ router.post(
 router.put(
   '/:id',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('estudiante', 'actualizar'),
   validateUUIDParam('id'),
   validateEstudiante,
@@ -47,6 +50,7 @@ router.put(
 router.delete(
   '/:id',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('estudiante', 'eliminar'),
   validateUUIDParam('id'),
   handleValidationErrors,

@@ -110,9 +110,30 @@ const requirePermission = (
   }
 }
 
+const cargarInstitucionesUsuario = async (req, res, next) => {
+  try {
+    const usuarioId = req.usuario?.id
+    if (!usuarioId) {
+      req.institucionIds = []
+      return next()
+    }
+    req.institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    next()
+  } catch (error) {
+    console.error('Error cargando instituciones del usuario:', error)
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: 'Error al cargar permisos del usuario',
+      timestamp: new Date().toISOString(),
+    })
+  }
+}
+
 module.exports = {
   obtenerInstitucionesUsuario,
   obtenerAccesosUsuario,
   usuarioTienePermiso,
   requirePermission,
+  cargarInstitucionesUsuario,
 }

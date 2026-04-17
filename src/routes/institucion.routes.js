@@ -10,17 +10,18 @@ const {
   desactivarInstitucion,
   obtenerEstadisticasInstitucion,
 } = require('../controllers/institucion.controller')
-const { requirePermission } = require('../utils/authorization')
+const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
 const {
   validateInstitucion,
   validateUUIDParam,
   handleValidationErrors,
 } = require('../utils/validators')
 
-router.get('/', verificarToken, requirePermission('institucion', 'ver'), listarInstituciones)
+router.get('/', verificarToken, cargarInstitucionesUsuario, requirePermission('institucion', 'ver'), listarInstituciones)
 router.get(
   '/:id',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('institucion', 'ver'),
   validateUUIDParam('id'),
   handleValidationErrors,
@@ -29,6 +30,7 @@ router.get(
 router.get(
   '/:id/estadisticas',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('institucion', 'estadisticas'),
   validateUUIDParam('id'),
   handleValidationErrors,
@@ -38,6 +40,7 @@ router.post('/', verificarToken, validateInstitucion, handleValidationErrors, cr
 router.put(
   '/:id',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('institucion', 'actualizar'),
   validateUUIDParam('id'),
   validateInstitucion,
@@ -47,6 +50,7 @@ router.put(
 router.patch(
   '/:id/desactivar',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('institucion', 'actualizar'),
   validateUUIDParam('id'),
   handleValidationErrors,

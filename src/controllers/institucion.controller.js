@@ -1,13 +1,11 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
-const { obtenerInstitucionesUsuario } = require('../utils/authorization')
 const { getRolByNombre } = require('../utils/roles')
 
 // Listar instituciones
 const listarInstituciones = async (req, res) => {
   try {
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(res, 'No autorizado para ver instituciones', 403)
@@ -39,8 +37,7 @@ const obtenerInstitucion = async (req, res) => {
       return sendError(res, 'ID de la institución es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const institucion = await prisma.institucion.findUnique({
       where: { id },
@@ -124,8 +121,7 @@ const actualizarInstitucion = async (req, res) => {
       return sendError(res, 'ID de la institución es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const institucionExistente = await prisma.institucion.findUnique({
       where: { id },
@@ -176,8 +172,7 @@ const desactivarInstitucion = async (req, res) => {
       return sendError(res, 'ID de la institución es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     const institucionExistente = await prisma.institucion.findUnique({
       where: { id },
@@ -229,8 +224,7 @@ const obtenerEstadisticasInstitucion = async (req, res) => {
       return sendError(res, 'ID de la institución es obligatorio', 400)
     }
 
-    const usuarioId = req.usuario?.id
-    const institucionIds = await obtenerInstitucionesUsuario(usuarioId)
+    const institucionIds = req.institucionIds
 
     if (!institucionIds.includes(id)) {
       return sendError(
