@@ -1,290 +1,334 @@
 # CertiValidate Backend
 
-Sistema backend para validar y emitir certificados digitales con hash único para verificación.
+API REST para emisión y verificación de certificados digitales con hash SHA-256.
 
-## 📋 Tabla de Contenidos
+---
+
+## Tabla de Contenidos
 
 - [Requisitos](#requisitos)
 - [Instalación](#instalación)
 - [Configuración](#configuración)
-- [Estructura del Proyecto](#estructura-del-proyecto)
-- [Arquitectura de Base de Datos (Prisma 7)](#arquitectura-de-base-de-datos)
-- [Endpoints API](#endpoints-api)
-- [Ejemplos de Uso](#ejemplos-de-uso)
+- [Arquitectura de conexión](#arquitectura-de-conexión)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Seguridad](#seguridad)
+- [Endpoints](#endpoints)
+- [Formato de respuestas](#formato-de-respuestas)
+- [Ejemplos de uso](#ejemplos-de-uso)
+- [Notas importantes](#notas-importantes)
 
-## 📦 Requisitos
+---
 
-- Node.js v14 o superior
-- npm v6 o superior
-- PostgreSQL (Supabase recomendado)
+## Requisitos
 
-## 🚀 Instalación
+- Node.js v18 o superior
+- npm v9 o superior
+- PostgreSQL — se recomienda Supabase
 
-1. **Clonar repositorio**
+---
+
+## Instalación
+
+**1. Clonar el repositorio**
 
 ```bash
-git clone <repository-url>
-cd CertiValidate-backend
+git clone https://github.com/corzocortez324-blip/certivalidate-backend.git
+cd certivalidate-backend
 ```
 
-2. **Instalar dependencias**
+**2. Instalar dependencias**
 
 ```bash
 npm install
 ```
-*(Nota: Esto instalará, además de Express, los adaptadores `@prisma/client`, `@prisma/adapter-pg` y `pg` obligatorios para la conexión a través de Pooler).*
 
-3. **Configurar variables de entorno**
+**3. Configurar variables de entorno**
 
 ```bash
 cp .env.example .env
 ```
-Edita `.env` con tus credenciales de Supabase (revisa la sección de Arquitectura).
 
-4. **Inicializar Base de Datos (Migraciones)**
+Edita `.env` con tus credenciales reales.
 
-Para ejecutar las migraciones y aplicar el esquema localmente:
-
-```bash
-npx prisma migrate dev --name init
-```
-
-5. **Iniciar servidor**
+**4. Aplicar migraciones**
 
 ```bash
-npm start
+npx prisma migrate deploy
 ```
 
-El servidor estará disponible en `http://localhost:3000`
+**5. Poblar datos iniciales**
 
-## ⚙️ Configuración
-
-Edita el archivo `.env` con tus valores reales:
-
-```env
-# Ambiente de ejecución
-PORT=3000
-NODE_ENV=development
-
-# JWT Secret y expiración
-JWT_SECRET=tu_secreto_super_seguro_aqui
-JWT_EXPIRES_IN=1h
-
-# URL del frontend para CORS
-FRONTEND_URL=http://localhost:3000
-
-# Base de datos Supabase / Prisma 7
-# URL de conexión con transaction pooler (puerto 6543) - para el código de la app
-DATABASE_URL="postgres://postgres.[ref]:[pwd]@aws-0-region.pooler.supabase.com:6543/postgres?pgbouncer=true"
-
-# URL de conexión directa (puerto 5432) - para migraciones de Prisma
-DIRECT_URL="postgres://postgres.[ref]:[pwd]@db.[ref].supabase.co:5432/postgres"
+```bash
+npm run seed
 ```
 
-## 🧠 Arquitectura de Base de Datos
+Crea los roles (admin, editor, lector) y los 18 permisos del sistema. Debe ejecutarse al menos una vez antes de crear usuarios.
 
-Este backend corre bajo **Prisma v7**, el cual exige configuraciones explícitas debido a que ya no maneja automáticamente las conexiones nativas universales internamente.
+**6. Iniciar el servidor**
 
-- **Conexión en Producción (pgbouncer)**: Prisma se conecta usando el adaptador nativo `@prisma/adapter-pg` para asegurar que las peticiones se enruten de forma ultra-rápida y concurrente hacia el **Transaction Pooler** de Supabase (Puerto 6543).
-- **`src/utils/prisma.js`**: Este archivo centraliza la instancia. Inicia el *Pool* de Postgres y mapea el adaptador a la configuración, en lugar de usar un simple `new PrismaClient()`.
-- **`prisma.config.ts`**: Utilizado exclusivamente por la CLI (Comandos en tu terminal). Sirve para indicarle a comandos como `npx prisma migrate` que usen forzosamente el túnel directo (`DIRECT_URL` en el puerto 5432). Es vital no omitir ni borrar este archivo.
-
-## 📁 Estructura del Proyecto
-
+```bash
+npm run dev   # desarrollo
+npm start     # producción
 ```
-src/
-├── index.js                          # Entrada principal del servidor
-├── controllers/
-│   ├── auth.controller.js           # Lógica de autenticación vinculada a BD
-│   └── certificado.controller.js    # Lógica de certificados vinculada a BD
-├── routes/
-│   ├── auth.routes.js               # Rutas de auth
-│   └── certificado.routes.js        # Rutas de certificados
-├── middlewares/
-│   └── auth.middleware.js           # Validación de tokens JWT
-└── utils/
-    ├── response.utils.js            # Formatos de respuesta estándar
-    ├── validators.js                # Validación de entrada
-    ├── pdf.generator.js             # Generación de PDFs
-    └── prisma.js                    # Inicializador avanzado (Adapter PG)
-```
-
-## 📡 Endpoints API
-
-### Health Check
-
-```http
-GET /health
-```
-
-Verifica que el servidor esté funcionando.
 
 ---
 
-### Autenticación
+## Configuración
 
-#### Registro
+El servidor no arranca si faltan `DATABASE_URL`, `JWT_SECRET` o `JWT_REFRESH_SECRET`.
 
-```http
-POST /api/auth/register
-Content-Type: application/json
+| Variable | Ejemplo | Descripción |
+|---|---|---|
+| `PORT` | `3000` | Puerto del servidor (opcional, default 3000) |
+| `NODE_ENV` | `production` | Entorno: development o production |
+| `DATABASE_URL` | `postgresql://...@pooler:6543/postgres` | URL del connection pooler de Supabase (puerto 6543) |
+| `DIRECT_URL` | `postgresql://...@db:5432/postgres` | URL directa para migraciones (puerto 5432) |
+| `JWT_SECRET` | cadena larga aleatoria | Secreto para firmar access tokens |
+| `JWT_REFRESH_SECRET` | cadena larga aleatoria diferente | Secreto para firmar refresh tokens |
+| `JWT_EXPIRES_IN` | `1h` | Duración del access token (opcional, default 1h) |
+| `JWT_REFRESH_EXPIRES_IN` | `7d` | Duración del refresh token (opcional, default 7d) |
+| `FRONTEND_URL` | `http://localhost:5173` | Origen permitido por CORS |
 
-{
-  "nombre": "Juan",
-  "apellido": "Pérez",
-  "email": "juan@example.com",
-  "password": "Segura123"
-}
+Para generar secretos seguros:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-**Validaciones:**
+---
 
-- Email debe ser válido
-- Nombre mínimo 3 caracteres
-- Contraseña mínimo 6 caracteres (mayúscula, minúscula, número)
+## Arquitectura de conexión
 
-**Respuesta exitosa (201):**
+El proyecto usa Prisma 7, que requiere configuración explícita de la capa de conexión.
+
+- **`src/utils/prisma.js`** — instancia única del cliente Prisma usando `@prisma/adapter-pg` con pool de conexiones. Todas las operaciones de la app pasan por aquí.
+- **`prisma.config.ts`** — usado exclusivamente por la CLI de Prisma (`migrate`, `db push`, `generate`). Apunta a `DIRECT_URL` para operaciones que requieren conexión directa sin pooler.
+- **`DATABASE_URL` puerto 6543** — usado por la app en tiempo de ejecución a través del connection pooler de Supabase.
+- **`DIRECT_URL` puerto 5432** — usado por las migraciones. Si tu red bloquea este puerto, ejecuta las migraciones desde datos móviles o desde el SQL Editor de Supabase.
+
+---
+
+## Estructura del proyecto
+
+```
+src/
+  index.js                    Entrada principal, middlewares globales, arranque
+  controllers/
+    auth.controller.js        Registro, login, logout, perfil, tokens
+    certificado.controller.js Emisión, verificación, revocación, descarga PDF
+    estudiante.controller.js  CRUD de estudiantes por institución
+    institucion.controller.js CRUD de instituciones y estadísticas
+    plantilla.controller.js   Gestión de plantillas de certificado
+    auditoria.controller.js   Consulta del log de auditoría
+  routes/                     Define las rutas y aplica middlewares por endpoint
+  middlewares/
+    auth.middleware.js        Verifica JWT y que el usuario esté activo en DB
+  utils/
+    env.js                    Lectura segura de variables de entorno
+    token.service.js          Lógica de refresh tokens (crear, rotar, revocar)
+    authorization.js          RBAC: requirePermission() y consulta de permisos
+    auditoria.js              Registro de operaciones en tabla Auditoria
+    validators.js             Validadores de entrada con express-validator
+    response.utils.js         Formato estándar de respuestas JSON
+    pdf.generator.js          Generación de PDF con pdfkit
+    roles.js                  Utilidad para obtener roles por nombre
+    prisma.js                 Instancia única del cliente Prisma
+prisma/
+  schema.prisma               Definición de modelos
+  seed.js                     Carga inicial de roles y permisos
+  migrations/                 Historial de migraciones SQL
+prisma.config.ts              Configuración de CLI de Prisma
+```
+
+---
+
+## Seguridad
+
+### Autenticación
+
+El sistema usa JWT con dos tokens:
+
+- **Access token** — vida corta (1h por defecto). Se envía en el header `Authorization: Bearer <token>`.
+- **Refresh token** — vida larga (7d por defecto). Se guarda hasheado en la base de datos.
+- **Rotación de refresh tokens** — cada vez que se usa un refresh token se revoca y se emite uno nuevo. Detecta el reuso de tokens robados.
+- **Revocación en cambio de contraseña** — al cambiar la contraseña se invalidan todos los refresh tokens activos del usuario.
+
+### Control de acceso por roles (RBAC)
+
+Cada usuario tiene un rol por institución. Los permisos se verifican en cada endpoint con `requirePermission(recurso, accion)`.
+
+| Rol | Permisos |
+|---|---|
+| `admin` | Todos los permisos del sistema (18) |
+| `editor` | Emitir, listar, ver y descargar certificados. CRUD de estudiantes y plantillas |
+| `lector` | Listar y ver certificados, estudiantes, instituciones y plantillas |
+
+### Otras medidas
+
+- **Helmet** — headers HTTP de seguridad en todas las respuestas
+- **Rate limiting** — 100 req/15min generales, 10 en autenticación, 50 en verificación pública
+- **Validación de entrada** — todos los endpoints validan con `express-validator`
+- **Variables obligatorias** — el servidor no arranca si faltan los secrets
+- **Auditoría** — cada operación crítica queda registrada con usuario, IP y timestamp
+
+---
+
+## Endpoints
+
+### Autenticación — `/api/auth`
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| POST | `/api/auth/register` | Público | Registro de nuevo usuario |
+| POST | `/api/auth/login` | Público | Login — retorna access y refresh token |
+| POST | `/api/auth/refresh` | Público | Renueva access token usando refresh token |
+| POST | `/api/auth/logout` | JWT | Revoca el refresh token activo |
+| GET | `/api/auth/perfil` | JWT | Obtiene datos del usuario autenticado |
+| PUT | `/api/auth/perfil` | JWT | Actualiza nombre, apellido o email |
+| PUT | `/api/auth/perfil/password` | JWT | Cambia la contraseña e invalida todas las sesiones |
+
+### Certificados — `/api/certificados`
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| POST | `/api/certificados/verificar` | Público | Verifica un certificado por hash o código único |
+| POST | `/api/certificados/emitir` | JWT + emitir | Genera un certificado con hash SHA-256 |
+| GET | `/api/certificados/listar` | JWT + listar | Lista certificados con paginación y filtros |
+| GET | `/api/certificados/:id` | JWT + ver | Detalle de un certificado |
+| GET | `/api/certificados/descargar/:id` | JWT + descargar | Descarga el certificado en PDF |
+| GET | `/api/certificados/:id/verificaciones` | JWT + ver | Historial de verificaciones públicas |
+| GET | `/api/certificados/:id/revocaciones` | JWT + ver | Historial de revocaciones |
+| POST | `/api/certificados/:id/revocar` | JWT + revocar | Revoca un certificado con motivo |
+
+### Estudiantes — `/api/estudiantes`
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/estudiantes` | JWT + listar | Lista estudiantes con paginación y búsqueda |
+| GET | `/api/estudiantes/:id` | JWT + ver | Detalle de un estudiante |
+| POST | `/api/estudiantes` | JWT + crear | Registra un nuevo estudiante |
+| PUT | `/api/estudiantes/:id` | JWT + actualizar | Actualiza datos del estudiante |
+| DELETE | `/api/estudiantes/:id` | JWT + eliminar | Elimina un estudiante sin certificados |
+
+### Instituciones — `/api/instituciones`
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/instituciones` | JWT + ver | Lista instituciones del usuario |
+| GET | `/api/instituciones/:id` | JWT + ver | Detalle de una institución |
+| GET | `/api/instituciones/:id/estadisticas` | JWT + estadisticas | Conteos de estudiantes, certificados y verificaciones |
+| POST | `/api/instituciones` | JWT | Crea institución y vincula al creador como admin |
+| PUT | `/api/instituciones/:id` | JWT + actualizar | Actualiza datos de la institución |
+| PATCH | `/api/instituciones/:id/desactivar` | JWT + actualizar | Desactiva una institución |
+
+### Plantillas — `/api/plantillas`
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/plantillas` | JWT + listar | Lista plantillas disponibles |
+| GET | `/api/plantillas/:id` | JWT + ver | Detalle de una plantilla |
+| POST | `/api/plantillas` | JWT + crear | Crea una nueva plantilla HTML |
+| PUT | `/api/plantillas/:id` | JWT + actualizar | Actualiza una plantilla existente |
+
+### Auditoría — `/api/auditoria`
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/auditoria` | JWT + ver auditoría | Lista el log de operaciones con filtros |
+| GET | `/api/auditoria/:id` | JWT + ver auditoría | Detalle de un registro |
+
+### Sistema
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/health` | Público | Estado del servidor y timestamp |
+
+---
+
+## Formato de respuestas
+
+Todos los endpoints retornan el mismo formato JSON.
+
+**Respuesta exitosa**
 
 ```json
 {
   "success": true,
-  "statusCode": 201,
-  "message": "Usuario registrado correctamente",
-  "data": { ... }
+  "statusCode": 200,
+  "message": "Operación exitosa",
+  "data": {},
+  "timestamp": "2026-04-17T00:00:00.000Z"
 }
 ```
 
----
+**Respuesta de error**
 
-#### Login
-
-```http
-POST /api/auth/login
-Content-Type: application/json
-
+```json
 {
-  "email": "juan@example.com",
-  "password": "Segura123"
+  "success": false,
+  "statusCode": 403,
+  "message": "No autorizado para emitir certificado",
+  "timestamp": "2026-04-17T00:00:00.000Z"
 }
 ```
 
-**Respuesta exitosa (200):** Se emite un token JWT.
+**Error de validación**
 
----
-
-#### Obtener Perfil
-
-```http
-GET /api/auth/perfil
-Authorization: Bearer <token>
-```
-
----
-
-### Certificados
-
-#### Emitir Certificado (Protegido)
-
-```http
-POST /api/certificados/emitir
-Authorization: Bearer <token>
-Content-Type: application/json
-
+```json
 {
-  "estudiante_id": "uuid-del-estudiante",
-  "institucion_id": "uuid-de-institucion",
-  "plantilla_id": "uuid-de-plantilla"
-}
-```
-
-**Respuesta exitosa (201):**
-Genera el registro formal del certificado y retorna un hash único.
-
----
-
-#### Listar Certificados (Protegido)
-
-```http
-GET /api/certificados/listar
-Authorization: Bearer <token>
-```
-
----
-
-#### Obtener Certificado por ID (Protegido)
-
-```http
-GET /api/certificados/:id
-Authorization: Bearer <token>
-```
-
----
-
-#### Verificar Certificado (Público)
-
-```http
-POST /api/certificados/verificar
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+  "success": false,
+  "statusCode": 400,
+  "message": "Errores de validación",
+  "errors": [
+    { "field": "email", "message": "Debe ser un email válido" }
+  ],
+  "timestamp": "2026-04-17T00:00:00.000Z"
 }
 ```
 
 ---
 
-#### Descargar Certificado como PDF (Protegido)
+## Ejemplos de uso
 
-```http
-GET /api/certificados/descargar/:id
-Authorization: Bearer <token>
+**Registro y login**
+
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Juan","apellido":"Perez","email":"juan@ejemplo.com","password":"Segura123"}'
+
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@ejemplo.com","password":"Segura123"}'
 ```
 
----
+**Verificación pública de certificado**
 
-## 💡 Ejemplos de Uso
+```bash
+curl -X POST http://localhost:3000/api/certificados/verificar \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"A1B2C3D4E5F6G7H8"}'
+```
 
-### Con cURL
-
-**Emitir Certificado**
+**Emitir un certificado**
 
 ```bash
 curl -X POST http://localhost:3000/api/certificados/emitir \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <tu_token>" \
+  -H "Authorization: Bearer <access_token>" \
   -d '{
-    "estudiante_id": "12345678-abcd-1234-abcd-1234567890ab",
-    "institucion_id": "87654321-dcba-4321-dcba-ba0987654321",
-    "plantilla_id": "11111111-2222-3333-4444-555555555555"
+    "estudiante_id": "uuid-del-estudiante",
+    "institucion_id": "uuid-de-la-institucion",
+    "plantilla_id": "uuid-de-la-plantilla"
   }'
 ```
 
----
+**Logout**
 
-## ✨ Mejoras Realizadas
+```bash
+curl -X POST http://localhost:3000/api/auth/logout \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<refresh_token>"}'
+```
 
-### 🔐 Seguridad & Datos
-
-- ✅ Integración estructurada con PostgreSQL usando Prisma 7
-- ✅ Variables de entorno para secrets y control DB de Supabase
-- ✅ JWT con expiración configurable
-- ✅ Validación de tokens mejorada (Bearer)
-
-### 📋 Validación y Persistencia
-
-- ✅ Almacén de registros persistente implementado
-- ✅ Verificación estricta de validación DB (Foreign Keys)
-- ✅ Validación de entrada
-
-### 🎯 Estructura y Herramientas
-
-- ✅ Incorporación de Prisma Client 7 utilizando `pg` pool y capa de abstracción `src/utils/prisma.js`
-- ✅ Configuración avanzada CLI local en `prisma.config.ts`
-- ✅ Respuestas consistentes a través de Utilities
-
----
-
-## 📞 Soporte
-
-Para reportar problemas o sugerencias, contacta al equipo de desarrollo.
