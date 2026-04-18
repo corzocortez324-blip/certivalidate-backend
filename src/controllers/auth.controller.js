@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt')
+const crypto = require('crypto')
 const jwt = require('jsonwebtoken')
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
@@ -6,6 +7,7 @@ const { registrarAuditoria } = require('../utils/auditoria')
 const { getClientIp } = require('../utils/validators')
 const { getEnv } = require('../utils/env')
 const logger = require('../utils/logger')
+const { enviarEmailVerificacion } = require('../utils/mailer')
 const {
   buildAccessToken,
   buildRefreshToken,
@@ -35,6 +37,8 @@ const register = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10)
+    const tokenVerificacion = crypto.randomBytes(32).toString('hex')
+    const expira = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
     const nuevoUsuario = await prisma.usuario.create({
       data: {
@@ -42,7 +46,16 @@ const register = async (req, res) => {
         apellido: apellido || '',
         email,
         password_hash: hash,
+        token_verificacion: tokenVerificacion,
+        token_verificacion_expira: expira,
+        email_verificado: false,
       },
+    })
+
+    await enviarEmailVerificacion({
+      email: nuevoUsuario.email,
+      nombre: nuevoUsuario.nombre,
+      token: tokenVerificacion,
     })
 
     await registrarAuditoria(
@@ -56,11 +69,11 @@ const register = async (req, res) => {
       getClientIp(req),
     )
 
-    const { password_hash: _, ...usuarioSinPassword } = nuevoUsuario
+    const { password_hash: _, token_verificacion: __, token_verificacion_expira: ___, ...usuarioSinPassword } = nuevoUsuario
 
     return sendSuccess(
       res,
-      usuarioSinPassword,
+      { ...usuarioSinPassword, email_verificado: false },
       'Usuario registrado correctamente',
       201,
     )
@@ -373,6 +386,39 @@ const obtenerPerfil = async (req, res) => {
   }
 }
 
+const verificarEmail = async (req, res) => {
+  try {
+    const { token } = req.query
+    if (!token) return sendError(res, 'Token de verificación requerido', 400)
+
+    const usuario = await prisma.usuario.findFirst({
+      where: {
+        token_verificacion: token,
+        token_verificacion_expira: { gt: new Date() },
+        email_verificado: false,
+      },
+    })
+
+    if (!usuario) {
+      return sendError(res, 'Token de verificación inválido o expirado', 400)
+    }
+
+    await prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        email_verificado: true,
+        token_verificacion: null,
+        token_verificacion_expira: null,
+      },
+    })
+
+    return sendSuccess(res, null, 'Email verificado correctamente', 200)
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en verificarEmail')
+    return sendError(res, 'Error al verificar email', 500)
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -381,4 +427,5 @@ module.exports = {
   obtenerPerfil,
   actualizarPerfil,
   cambiarPassword,
+  verificarEmail,
 }

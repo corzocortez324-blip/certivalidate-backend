@@ -9,6 +9,7 @@ const registrarAuditoria = async (
   valores_antes,
   valores_despues,
   ip,
+  institucion_id = null,
 ) => {
   if (!usuario_id) {
     logger.warn('registrarAuditoria: usuario_id vacío, auditoría omitida')
@@ -25,6 +26,7 @@ const registrarAuditoria = async (
         valores_antes: valores_antes || null,
         valores_despues: valores_despues || null,
         ip: ip || null,
+        institucion_id: institucion_id || null,
       },
     })
   } catch (error) {

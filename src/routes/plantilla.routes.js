@@ -7,6 +7,7 @@ const {
   obtenerPlantilla,
   crearPlantilla,
   actualizarPlantilla,
+  archivarPlantilla,
 } = require('../controllers/plantilla.controller')
 const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
 const {
@@ -45,6 +46,16 @@ router.put(
   validatePlantilla,
   handleValidationErrors,
   actualizarPlantilla,
+)
+
+router.delete(
+  '/:id',
+  verificarToken,
+  cargarInstitucionesUsuario,
+  requirePermission('plantilla', 'archivar'),
+  validateUUIDParam('id'),
+  handleValidationErrors,
+  archivarPlantilla,
 )
 
 module.exports = router

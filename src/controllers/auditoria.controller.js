@@ -2,45 +2,15 @@ const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
 const logger = require('../utils/logger')
 
-// Límite defensivo: evita traer decenas de miles de IDs a memoria.
-// TODO: reemplazar por un campo institucion_id directo en Auditoria cuando se migre el schema.
-const ID_FETCH_LIMIT = 5000
-
-const construirFiltroAuditoriaAutorizada = async (usuarioId, institucionIds) => {
+const construirFiltroAuditoriaAutorizada = (usuarioId, institucionIds) => {
   if (institucionIds.length === 0) {
     return null
   }
 
-  const [certificados, estudiantes, plantillas] = await Promise.all([
-    prisma.certificado.findMany({
-      where: { institucion_id: { in: institucionIds } },
-      select: { id: true },
-      take: ID_FETCH_LIMIT,
-    }),
-    prisma.estudiante.findMany({
-      where: { institucion_id: { in: institucionIds } },
-      select: { id: true },
-      take: ID_FETCH_LIMIT,
-    }),
-    prisma.plantillaCertificado.findMany({
-      where: { institucion_id: { in: institucionIds } },
-      select: { id: true },
-      take: ID_FETCH_LIMIT,
-    }),
-  ])
-
-  const certIds = certificados.map((item) => item.id)
-  const estudianteIds = estudiantes.map((item) => item.id)
-  const plantillaIds = plantillas.map((item) => item.id)
-
   return {
     OR: [
+      { institucion_id: { in: institucionIds } },
       { entidad: 'Usuario', entidad_id: usuarioId },
-      { entidad: 'Institucion', entidad_id: { in: institucionIds } },
-      { entidad: 'Certificado', entidad_id: { in: certIds } },
-      { entidad: 'Estudiante', entidad_id: { in: estudianteIds } },
-      { entidad: 'PlantillaCertificado', entidad_id: { in: plantillaIds } },
-      { entidad: 'Plantilla', entidad_id: { in: plantillaIds } },
     ],
   }
 }
@@ -54,7 +24,7 @@ const listarAuditoria = async (req, res) => {
     )
     const { entidad, accion, usuario_id, fecha_desde, fecha_hasta } = req.query
 
-    const filtroAutorizado = await construirFiltroAuditoriaAutorizada(
+    const filtroAutorizado = construirFiltroAuditoriaAutorizada(
       req.usuario?.id,
       req.institucionIds,
     )
@@ -133,7 +103,7 @@ const obtenerAuditoriaPorEntidad = async (req, res) => {
       return sendError(res, 'Entidad y entidad_id son obligatorios', 400)
     }
 
-    const filtroAutorizado = await construirFiltroAuditoriaAutorizada(
+    const filtroAutorizado = construirFiltroAuditoriaAutorizada(
       req.usuario?.id,
       req.institucionIds,
     )

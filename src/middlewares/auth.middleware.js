@@ -28,6 +28,7 @@ const verificarToken = async (req, res, next) => {
         nombre: true,
         email: true,
         activo: true,
+        email_verificado: true,
         deleted_at: true,
       },
     })
@@ -44,6 +45,7 @@ const verificarToken = async (req, res, next) => {
       id: usuario.id,
       nombre: usuario.nombre,
       email: usuario.email,
+      email_verificado: usuario.email_verificado,
     }
 
     next()
@@ -59,4 +61,12 @@ const verificarToken = async (req, res, next) => {
   }
 }
 
+const requireEmailVerified = (req, res, next) => {
+  if (!req.usuario?.email_verificado) {
+    return sendError(res, 'Debes verificar tu email antes de continuar', 403)
+  }
+  next()
+}
+
 module.exports = verificarToken
+module.exports.requireEmailVerified = requireEmailVerified

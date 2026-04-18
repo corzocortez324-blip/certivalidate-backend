@@ -1,4 +1,4 @@
-const requiredEnv = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET']
+const requiredEnv = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'ENCRYPTION_KEY']
 
 const warnEnv = [
   { key: 'FRONTEND_URL', fallback: 'http://localhost:3000', note: 'CORS permitirá solo el frontend local' },

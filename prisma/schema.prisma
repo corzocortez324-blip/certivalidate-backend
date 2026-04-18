@@ -3,9 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 model Institucion {
@@ -15,6 +13,7 @@ model Institucion {
   logo_url      String?
   activa        Boolean                @default(true)
   created_at    DateTime               @default(now())
+  auditorias    Auditoria[]
   certificados  Certificado[]
   estudiantes   Estudiante[]
   integraciones Integracion[]
@@ -28,11 +27,14 @@ model Usuario {
   apellido      String
   email         String               @unique
   password_hash String
-  activo        Boolean              @default(true)
-  ultimo_acceso DateTime?
-  created_at    DateTime             @default(now())
-  updated_at    DateTime?
-  deleted_at    DateTime?
+  activo                     Boolean   @default(true)
+  email_verificado           Boolean   @default(false)
+  token_verificacion         String?
+  token_verificacion_expira  DateTime?
+  ultimo_acceso              DateTime?
+  created_at                 DateTime  @default(now())
+  updated_at                 DateTime?
+  deleted_at                 DateTime?
   auditorias     Auditoria[]
   revocaciones   Revocacion[]
   instituciones  UsuarioInstitucion[]
@@ -80,6 +82,7 @@ model RolPermiso {
 
 /// Modelo planificado — integraciones con LMS externos (Moodle, Canvas, etc.).
 /// No expuesto en ningún endpoint aún. Mantener en schema para no perder la migración.
+/// api_key se almacena cifrada con AES-256-GCM. Leer con src/utils/crypto.js decrypt() antes de usar.
 model Integracion {
   id                  String      @id @default(uuid())
   institucion_id      String
@@ -117,6 +120,10 @@ model PlantillaCertificado {
   institucion    Institucion   @relation(fields: [institucion_id], references: [id])
 }
 
+/// Unicidad de negocio validada a nivel de aplicación en emitirCertificado:
+/// no se permite emitir si ya existe un certificado vigente (estado != revocado) para el mismo
+/// estudiante+plantilla. Un constraint @@unique([estudiante_id, plantilla_id]) a nivel de BD
+/// no aplica porque el mismo estudiante puede recibir el mismo certificado tras revocar el anterior.
 model Certificado {
   id               String                  @id @default(uuid())
   estudiante_id    String
@@ -199,7 +206,7 @@ model RefreshToken {
 }
 
 model Auditoria {
-  id              BigInt   @id @default(autoincrement())
+  id              BigInt      @id @default(autoincrement())
   usuario_id      String
   accion          String
   entidad         String
@@ -207,6 +214,8 @@ model Auditoria {
   valores_antes   String?
   valores_despues String?
   ip              String?
-  fecha           DateTime @default(now())
-  usuario         Usuario  @relation(fields: [usuario_id], references: [id])
+  institucion_id  String?
+  fecha           DateTime    @default(now())
+  institucion     Institucion? @relation(fields: [institucion_id], references: [id])
+  usuario         Usuario     @relation(fields: [usuario_id], references: [id])
 }

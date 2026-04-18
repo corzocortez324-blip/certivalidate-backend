@@ -12,6 +12,7 @@ const createTestUser = async (emailSuffix, password = 'TestPass123') => {
       apellido: 'User',
       email: `${TEST_PREFIX}${emailSuffix}@certivalidate.test`,
       password_hash: hash,
+      email_verificado: true,
     },
   })
 }

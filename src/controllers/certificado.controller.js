@@ -70,6 +70,23 @@ const emitirCertificado = async (req, res) => {
       )
     }
 
+    const certificadoExistente = await prisma.certificado.findFirst({
+      where: {
+        estudiante_id,
+        plantilla_id,
+        deleted_at: null,
+        estado: { not: 'revocado' },
+      },
+    })
+
+    if (certificadoExistente) {
+      return sendError(
+        res,
+        'Ya existe un certificado vigente para este estudiante con esta plantilla. Revoca el existente antes de emitir uno nuevo.',
+        409,
+      )
+    }
+
     const fechaEmision = new Date()
     const codigo_unico = crypto.randomBytes(8).toString('hex').toUpperCase()
     const contenidoReal = `${estudiante.id}|${estudiante.nombre}|${estudiante.apellido}|${estudiante.email}|${institucion.id}|${institucion.nombre}|${plantilla.id}|${plantilla.nombre}|${codigo_unico}|${fechaEmision.toISOString()}`
@@ -105,6 +122,7 @@ const emitirCertificado = async (req, res) => {
             codigo_unico,
           }),
           ip: getClientIp(req),
+          institucion_id,
         },
       })
 
@@ -624,6 +642,7 @@ const revocarCertificado = async (req, res) => {
       JSON.stringify({ estado: estadoAnterior }),
       JSON.stringify({ estado: 'revocado' }),
       ip,
+      certificadoActualizado.institucion_id,
     )
 
     return sendSuccess(

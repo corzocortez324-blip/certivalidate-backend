@@ -184,9 +184,50 @@ const actualizarPlantilla = async (req, res) => {
   }
 }
 
+const archivarPlantilla = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const plantilla = await prisma.plantillaCertificado.findUnique({ where: { id } })
+    if (!plantilla) return sendError(res, 'Plantilla no encontrada', 404)
+
+    const institucionIds = req.institucionIds
+    if (!institucionIds.includes(plantilla.institucion_id)) {
+      return sendError(res, 'No autorizado para archivar esta plantilla', 403)
+    }
+
+    if (!plantilla.activa) {
+      return sendSuccess(res, plantilla, 'La plantilla ya estaba inactiva', 200)
+    }
+
+    const certActivos = await prisma.certificado.count({
+      where: {
+        plantilla_id: id,
+        estado: 'valido',
+        deleted_at: null,
+      },
+    })
+
+    const plantillaActualizada = await prisma.plantillaCertificado.update({
+      where: { id },
+      data: { activa: false },
+    })
+
+    const mensaje = certActivos > 0
+      ? `Plantilla archivada. Advertencia: tiene ${certActivos} certificado(s) válido(s) emitido(s) con esta plantilla.`
+      : 'Plantilla archivada correctamente'
+
+    return sendSuccess(res, plantillaActualizada, mensaje, 200)
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en archivarPlantilla')
+    return sendError(res, 'Error al archivar plantilla', 500)
+  }
+}
+
 module.exports = {
   listarPlantillas,
   obtenerPlantilla,
   crearPlantilla,
   actualizarPlantilla,
+  archivarPlantilla,
 }

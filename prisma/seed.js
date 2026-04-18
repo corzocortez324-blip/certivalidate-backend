@@ -29,6 +29,7 @@ const PERMISOS = [
   { recurso: 'institucion', accion: 'estadisticas' },
   { recurso: 'plantilla', accion: 'crear' },
   { recurso: 'plantilla', accion: 'actualizar' },
+  { recurso: 'plantilla', accion: 'archivar' },
   { recurso: 'plantilla', accion: 'ver' },
   { recurso: 'plantilla', accion: 'listar' },
   { recurso: 'auditoria', accion: 'ver' },
@@ -41,7 +42,7 @@ const PERMISOS_POR_ROL = {
     'certificado:ver', 'certificado:descargar',
     'estudiante:crear', 'estudiante:actualizar', 'estudiante:listar', 'estudiante:ver',
     'institucion:ver', 'institucion:estadisticas',
-    'plantilla:crear', 'plantilla:actualizar', 'plantilla:ver', 'plantilla:listar',
+    'plantilla:crear', 'plantilla:actualizar', 'plantilla:archivar', 'plantilla:ver', 'plantilla:listar',
     'auditoria:ver',
   ],
   lector: [
