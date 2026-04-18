@@ -49,6 +49,10 @@ const emitirCertificado = async (req, res) => {
       return sendError(res, 'Plantilla no encontrada', 404)
     }
 
+    if (!plantilla.activa) {
+      return sendError(res, 'La plantilla está inactiva y no puede usarse para emitir certificados', 400)
+    }
+
     if (plantilla.institucion_id !== institucion_id) {
       return sendError(
         res,
@@ -155,6 +159,14 @@ const verificarCertificado = async (req, res) => {
       )
     }
 
+    const contenidoVerificacion = `${cert.estudiante.id}|${cert.estudiante.nombre}|${cert.estudiante.apellido}|${cert.estudiante.email}|${cert.institucion.id}|${cert.institucion.nombre}|${cert.plantilla.id}|${cert.plantilla.nombre}|${cert.codigo_unico}|${cert.fecha_emision.toISOString()}`
+    const hashRecomputado = crypto.createHash('sha256').update(contenidoVerificacion).digest('hex')
+    const hashVerificado = hashRecomputado === cert.hash_sha256
+
+    if (!hashVerificado) {
+      return sendError(res, 'Integridad del certificado comprometida', 409)
+    }
+
     const ip = getClientIp(req)
     const userAgent = req.headers['user-agent'] || null
 
@@ -187,6 +199,7 @@ const verificarCertificado = async (req, res) => {
         codigo_unico: cert.codigo_unico,
         estado: resultado === 'valido' ? cert.estado : resultado,
         mensaje,
+        hash_verificado: hashVerificado,
         fecha_emision: cert.fecha_emision,
         fecha_expiracion: cert.fecha_expiracion,
         estudiante: {
@@ -200,7 +213,7 @@ const verificarCertificado = async (req, res) => {
           nombre: cert.plantilla?.nombre,
         },
       },
-      'Certificado verificado correctamente',
+      mensaje,
       200,
     )
   } catch (error) {
@@ -557,11 +570,13 @@ const revocarCertificado = async (req, res) => {
     }
 
     const institucionIds = req.institucionIds
+    let estadoAnterior = null
 
     const [certificadoActualizado] = await prisma.$transaction(async (tx) => {
       const certificado = await tx.certificado.findFirst({
         where: { id, deleted_at: null },
       })
+      if (certificado) estadoAnterior = certificado.estado
 
       if (!certificado) {
         const err = new Error('Certificado no encontrado')
@@ -606,7 +621,7 @@ const revocarCertificado = async (req, res) => {
       'REVOCAR_CERTIFICADO',
       'Certificado',
       id,
-      JSON.stringify({ estado: certificado.estado }),
+      JSON.stringify({ estado: estadoAnterior }),
       JSON.stringify({ estado: 'revocado' }),
       ip,
     )
@@ -621,7 +636,7 @@ const revocarCertificado = async (req, res) => {
     if (error.statusCode) {
       return sendError(res, error.message, error.statusCode)
     }
-    console.error('Error en revocarCertificado:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en revocarCertificado')
     return sendError(res, 'Error al revocar certificado', 500)
   }
 }

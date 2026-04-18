@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit')
+const logger = require('./logger')
 
 const sanitizeFilename = (value) =>
   String(value || 'certificado')
@@ -134,7 +135,7 @@ const generarPDF = (certificado, res) => {
 
     doc.end()
   } catch (error) {
-    console.error('Error generando PDF:', error)
+    logger.error({ err: error }, 'Error generando PDF')
     res.status(500).json({
       success: false,
       statusCode: 500,

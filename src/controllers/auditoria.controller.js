@@ -126,6 +126,8 @@ const listarAuditoria = async (req, res) => {
 const obtenerAuditoriaPorEntidad = async (req, res) => {
   try {
     const { entidad, entidad_id } = req.params
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100)
 
     if (!entidad || !entidad_id) {
       return sendError(res, 'Entidad y entidad_id son obligatorios', 400)
@@ -140,16 +142,16 @@ const obtenerAuditoriaPorEntidad = async (req, res) => {
       return sendError(res, 'No autorizado para ver auditoría', 403)
     }
 
+    const where = {
+      AND: [filtroAutorizado, { entidad, entidad_id }],
+    }
+
+    const total = await prisma.auditoria.count({ where })
+
     const auditorias = await prisma.auditoria.findMany({
-      where: {
-        AND: [
-          filtroAutorizado,
-          {
-            entidad,
-            entidad_id,
-          },
-        ],
-      },
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
       orderBy: { fecha: 'desc' },
       include: {
         usuario: {
@@ -163,9 +165,17 @@ const obtenerAuditoriaPorEntidad = async (req, res) => {
       },
     })
 
+    const totalPages = Math.max(Math.ceil(total / limit), 1)
+
     return sendSuccess(
       res,
-      auditorias,
+      {
+        total,
+        page,
+        limit,
+        totalPages,
+        auditorias,
+      },
       'Historial de auditoría obtenido correctamente',
       200,
     )

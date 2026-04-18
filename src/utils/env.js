@@ -29,7 +29,7 @@ const validateRequiredEnv = () => {
   if (process.env.NODE_ENV === 'production') {
     for (const { key, note } of warnEnv) {
       if (!process.env[key]) {
-        console.warn(`[WARN] Variable ${key} no definida en producción: ${note}`)
+        require('./logger').warn(`[WARN] Variable ${key} no definida en producción: ${note}`)
       }
     }
   }

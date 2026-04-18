@@ -14,7 +14,7 @@ const buildAccessToken = (usuario) =>
       nombre: usuario.nombre,
     },
     getEnv('JWT_SECRET'),
-    { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+    { expiresIn: getEnv('JWT_EXPIRES_IN', '1h') },
   )
 
 const buildRefreshToken = (usuario) =>

@@ -18,8 +18,8 @@ const validateRegister = [
     .withMessage('Debe ser un email válido')
     .normalizeEmail(),
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('La contraseña debe tener al menos 6 caracteres')
+    .isLength({ min: 8 })
+    .withMessage('La contraseña debe tener al menos 8 caracteres')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('La contraseña debe contener mayúscula, minúscula y número'),
 ]
@@ -57,8 +57,8 @@ const validateChangePassword = [
     .notEmpty()
     .withMessage('La contraseña actual es obligatoria'),
   body('newPassword')
-    .isLength({ min: 6 })
-    .withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+    .isLength({ min: 8 })
+    .withMessage('La nueva contraseña debe tener al menos 8 caracteres')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage(
       'La nueva contraseña debe contener mayúscula, minúscula y número',
@@ -97,7 +97,9 @@ const validateRevocacion = [
   body('motivo_codigo')
     .trim()
     .notEmpty()
-    .withMessage('motivo_codigo es obligatorio'),
+    .withMessage('motivo_codigo es obligatorio')
+    .isIn(['FRAUDE', 'ERROR_DATOS', 'DECISION_INSTITUCIONAL', 'DUPLICADO', 'CADUCIDAD', 'OTRO'])
+    .withMessage('motivo_codigo debe ser uno de: FRAUDE, ERROR_DATOS, DECISION_INSTITUCIONAL, DUPLICADO, CADUCIDAD, OTRO'),
   body('motivo_detalle')
     .optional()
     .trim()
@@ -237,13 +239,7 @@ const validateUUIDParam = (name = 'id') => [
   param(name).trim().isUUID().withMessage(`${name} debe ser un UUID válido`),
 ]
 
-const getClientIp = (req) => {
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim()
-  }
-  return req.ip || req.connection?.remoteAddress || null
-}
+const getClientIp = (req) => req.ip || null
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req)

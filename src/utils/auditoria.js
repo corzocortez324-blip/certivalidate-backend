@@ -1,3 +1,5 @@
+const logger = require('./logger')
+
 const registrarAuditoria = async (
   prisma,
   usuario_id,
@@ -9,9 +11,7 @@ const registrarAuditoria = async (
   ip,
 ) => {
   if (!usuario_id) {
-    console.warn(
-      'Advertencia de auditoría: usuario_id vacío, no se registrará auditoría.',
-    )
+    logger.warn('registrarAuditoria: usuario_id vacío, auditoría omitida')
     return
   }
 
@@ -28,7 +28,7 @@ const registrarAuditoria = async (
       },
     })
   } catch (error) {
-    console.error('Error registrando auditoría:', error)
+    logger.error({ err: error }, 'Error registrando auditoría')
     // No detener el flujo principal por un fallo en auditoría
   }
 }
