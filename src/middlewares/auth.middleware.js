@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken')
 const prisma = require('../utils/prisma')
 const { sendError } = require('../utils/response.utils')
 const { getEnv } = require('../utils/env')
+const logger = require('../utils/logger')
 
 const verificarToken = async (req, res, next) => {
   try {
@@ -53,7 +54,7 @@ const verificarToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return sendError(res, 'Token inválido', 401)
     }
-    console.error('Error de autenticación:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error de autenticación')
     return sendError(res, 'Error de autenticación', 401)
   }
 }

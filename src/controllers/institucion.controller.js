@@ -1,6 +1,7 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
 const { getRolByNombre } = require('../utils/roles')
+const logger = require('../utils/logger')
 
 // Listar instituciones
 const listarInstituciones = async (req, res) => {
@@ -23,12 +24,12 @@ const listarInstituciones = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en listarInstituciones:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en listarInstituciones')
     return sendError(res, 'Error al listar instituciones', 500)
   }
 }
 
-// Obtener institución por ID con estudiantes y plantillas
+// Obtener institución por ID con conteos (no se incluyen listas completas para evitar respuestas masivas)
 const obtenerInstitucion = async (req, res) => {
   try {
     const { id } = req.params
@@ -39,20 +40,21 @@ const obtenerInstitucion = async (req, res) => {
 
     const institucionIds = req.institucionIds
 
+    if (!institucionIds.includes(id)) {
+      return sendError(res, 'No autorizado para ver esta institución', 403)
+    }
+
     const institucion = await prisma.institucion.findUnique({
       where: { id },
       include: {
-        estudiantes: true,
-        plantillas: true,
+        _count: {
+          select: { estudiantes: true, plantillas: true, certificados: true },
+        },
       },
     })
 
     if (!institucion) {
       return sendError(res, 'Institución no encontrada', 404)
-    }
-
-    if (!institucionIds.includes(id)) {
-      return sendError(res, 'No autorizado para ver esta institución', 403)
     }
 
     return sendSuccess(
@@ -62,7 +64,7 @@ const obtenerInstitucion = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en obtenerInstitucion:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerInstitucion')
     return sendError(res, 'Error al obtener institución', 500)
   }
 }
@@ -106,7 +108,7 @@ const crearInstitucion = async (req, res) => {
       201,
     )
   } catch (error) {
-    console.error('Error en crearInstitucion:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en crearInstitucion')
     return sendError(res, 'Error al crear institución', 500)
   }
 }
@@ -158,7 +160,7 @@ const actualizarInstitucion = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en actualizarInstitucion:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en actualizarInstitucion')
     return sendError(res, 'Error al actualizar institución', 500)
   }
 }
@@ -211,7 +213,7 @@ const desactivarInstitucion = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en desactivarInstitucion:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en desactivarInstitucion')
     return sendError(res, 'Error al desactivar institución', 500)
   }
 }
@@ -303,7 +305,7 @@ const obtenerEstadisticasInstitucion = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en obtenerEstadisticasInstitucion:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerEstadisticasInstitucion')
     return sendError(
       res,
       'Error al obtener estadísticas de la institución',

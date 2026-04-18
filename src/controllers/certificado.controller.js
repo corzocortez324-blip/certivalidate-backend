@@ -4,6 +4,7 @@ const generarPDF = require('../utils/pdf.generator')
 const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { getClientIp } = require('../utils/validators')
+const logger = require('../utils/logger')
 
 // Crear certificado
 const emitirCertificado = async (req, res) => {
@@ -113,7 +114,7 @@ const emitirCertificado = async (req, res) => {
       201,
     )
   } catch (error) {
-    console.error('Error en emitirCertificado:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en emitirCertificado')
     return sendError(res, 'Error al generar certificado', 500)
   }
 }
@@ -203,7 +204,7 @@ const verificarCertificado = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en verificarCertificado:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en verificarCertificado')
     return sendError(res, 'Error al verificar certificado', 500)
   }
 }
@@ -251,7 +252,7 @@ const descargarCertificado = async (req, res) => {
     // Nota: El pdf.generator puede necesitar ser adaptado para las nuevas propiedades (ej. cert.estudiante.nombre en vez de cert.estudiante)
     generarPDF(cert, res)
   } catch (error) {
-    console.error('Error en descargarCertificado:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en descargarCertificado')
     return sendError(res, 'Error al descargar certificado', 500)
   }
 }
@@ -347,7 +348,7 @@ const listarCertificados = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en listarCertificados:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en listarCertificados')
     return sendError(res, 'Error al listar certificados', 500)
   }
 }
@@ -386,7 +387,7 @@ const obtenerCertificado = async (req, res) => {
 
     return sendSuccess(res, cert, 'Certificado obtenido correctamente', 200)
   } catch (error) {
-    console.error('Error en obtenerCertificado:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerCertificado')
     return sendError(res, 'Error al obtener certificado', 500)
   }
 }
@@ -411,6 +412,16 @@ const obtenerVerificaciones = async (req, res) => {
 
     if (!certificado) {
       return sendError(res, 'Certificado no encontrado', 404)
+    }
+
+    const institucionIds = req.institucionIds
+
+    if (institucionIds.length === 0) {
+      return sendError(res, 'No autorizado para ver las verificaciones de este certificado', 403)
+    }
+
+    if (!institucionIds.includes(certificado.institucion_id)) {
+      return sendError(res, 'No autorizado para ver las verificaciones de este certificado', 403)
     }
 
     const total = await prisma.verificacionPublica.count({
@@ -445,7 +456,7 @@ const obtenerVerificaciones = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en obtenerVerificaciones:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerVerificaciones')
     return sendError(res, 'Error al obtener verificaciones públicas', 500)
   }
 }
@@ -526,7 +537,7 @@ const obtenerRevocaciones = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en obtenerRevocaciones:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerRevocaciones')
     return sendError(res, 'Error al obtener historial de revocaciones', 500)
   }
 }
@@ -545,45 +556,47 @@ const revocarCertificado = async (req, res) => {
       return sendError(res, 'motivo_codigo es obligatorio', 400)
     }
 
-    const certificado = await prisma.certificado.findFirst({
-      where: { id, deleted_at: null },
-    })
-
-    if (!certificado) {
-      return sendError(res, 'Certificado no encontrado', 404)
-    }
-
     const institucionIds = req.institucionIds
 
-    if (institucionIds.length === 0) {
-      return sendError(res, 'No autorizado para revocar este certificado', 403)
-    }
+    const [certificadoActualizado] = await prisma.$transaction(async (tx) => {
+      const certificado = await tx.certificado.findFirst({
+        where: { id, deleted_at: null },
+      })
 
-    if (!institucionIds.includes(certificado.institucion_id)) {
-      return sendError(res, 'No autorizado para revocar este certificado', 403)
-    }
+      if (!certificado) {
+        const err = new Error('Certificado no encontrado')
+        err.statusCode = 404
+        throw err
+      }
 
-    if (certificado.estado === 'revocado') {
-      return sendError(res, 'El certificado ya está revocado', 409)
-    }
+      if (institucionIds.length === 0 || !institucionIds.includes(certificado.institucion_id)) {
+        const err = new Error('No autorizado para revocar este certificado')
+        err.statusCode = 403
+        throw err
+      }
 
-    const [certificadoActualizado] = await prisma.$transaction([
-      prisma.certificado.update({
-        where: { id },
-        data: {
-          estado: 'revocado',
-        },
-      }),
-      prisma.revocacion.create({
-        data: {
-          certificado_id: id,
-          revocado_por: req.usuario?.id || '',
-          motivo_codigo,
-          motivo_detalle: motivo_detalle || null,
-          fecha_revocacion: new Date(),
-        },
-      }),
-    ])
+      if (certificado.estado === 'revocado') {
+        const err = new Error('El certificado ya está revocado')
+        err.statusCode = 409
+        throw err
+      }
+
+      return Promise.all([
+        tx.certificado.update({
+          where: { id },
+          data: { estado: 'revocado' },
+        }),
+        tx.revocacion.create({
+          data: {
+            certificado_id: id,
+            revocado_por: req.usuario?.id || '',
+            motivo_codigo,
+            motivo_detalle: motivo_detalle || null,
+            fecha_revocacion: new Date(),
+          },
+        }),
+      ])
+    })
 
     const ip = getClientIp(req)
 
@@ -605,6 +618,9 @@ const revocarCertificado = async (req, res) => {
       200,
     )
   } catch (error) {
+    if (error.statusCode) {
+      return sendError(res, error.message, error.statusCode)
+    }
     console.error('Error en revocarCertificado:', error)
     return sendError(res, 'Error al revocar certificado', 500)
   }

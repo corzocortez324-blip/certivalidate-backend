@@ -12,7 +12,8 @@ const {
 } = require('../controllers/institucion.controller')
 const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
 const {
-  validateInstitucion,
+  validateInstitucionCrear,
+  validateInstitucionActualizar,
   validateUUIDParam,
   handleValidationErrors,
 } = require('../utils/validators')
@@ -36,14 +37,16 @@ router.get(
   handleValidationErrors,
   obtenerEstadisticasInstitucion,
 )
-router.post('/', verificarToken, validateInstitucion, handleValidationErrors, crearInstitucion)
+// Cualquier usuario autenticado puede crear una institución y queda como admin de ella.
+// No aplica requirePermission porque un usuario nuevo sin instituciones aún no tiene permisos.
+router.post('/', verificarToken, validateInstitucionCrear, handleValidationErrors, crearInstitucion)
 router.put(
   '/:id',
   verificarToken,
   cargarInstitucionesUsuario,
   requirePermission('institucion', 'actualizar'),
   validateUUIDParam('id'),
-  validateInstitucion,
+  validateInstitucionActualizar,
   handleValidationErrors,
   actualizarInstitucion,
 )

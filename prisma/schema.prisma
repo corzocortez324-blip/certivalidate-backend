@@ -76,8 +76,8 @@ model RolPermiso {
   @@id([rol_id, permiso_id])
 }
 
-/// ///////////////////////
-/// ///////////////////////
+/// Modelo planificado — integraciones con LMS externos (Moodle, Canvas, etc.).
+/// No expuesto en ningún endpoint aún. Mantener en schema para no perder la migración.
 model Integracion {
   id                  String      @id @default(uuid())
   institucion_id      String
@@ -137,6 +137,8 @@ model Certificado {
   verificaciones   VerificacionPublica[]
 }
 
+/// Modelo planificado — campos dinámicos por certificado (ej. calificación, horas).
+/// No expuesto en ningún endpoint aún. Requiere definir el contrato de claves antes de activar.
 model CertificadoMetadata {
   id             String      @id @default(uuid())
   certificado_id String
@@ -166,6 +168,8 @@ model VerificacionPublica {
   certificado    Certificado @relation(fields: [certificado_id], references: [id])
 }
 
+/// Modelo planificado — anclaje de hashes de certificados en blockchain (Ethereum/Polygon).
+/// No expuesto en ningún endpoint aún. La lógica de firma está pendiente de implementar.
 model BlockchainTransaccion {
   id             String      @id @default(uuid())
   certificado_id String

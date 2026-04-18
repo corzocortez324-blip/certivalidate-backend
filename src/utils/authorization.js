@@ -1,4 +1,5 @@
 const prisma = require('./prisma')
+const logger = require('./logger')
 
 const obtenerInstitucionesUsuario = async (usuarioId) => {
   if (!usuarioId) return []
@@ -100,7 +101,7 @@ const requirePermission = (
 
     next()
   } catch (error) {
-    console.error('Error validando permisos:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error validando permisos')
     return res.status(500).json({
       success: false,
       statusCode: 500,
@@ -120,7 +121,7 @@ const cargarInstitucionesUsuario = async (req, res, next) => {
     req.institucionIds = await obtenerInstitucionesUsuario(usuarioId)
     next()
   } catch (error) {
-    console.error('Error cargando instituciones del usuario:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error cargando instituciones del usuario')
     return res.status(500).json({
       success: false,
       statusCode: 500,

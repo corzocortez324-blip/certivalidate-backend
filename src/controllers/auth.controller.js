@@ -5,6 +5,7 @@ const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { getClientIp } = require('../utils/validators')
 const { getEnv } = require('../utils/env')
+const logger = require('../utils/logger')
 const {
   buildAccessToken,
   buildRefreshToken,
@@ -64,7 +65,7 @@ const register = async (req, res) => {
       201,
     )
   } catch (error) {
-    console.error('Error en register:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en register')
     return sendError(res, 'Error en el registro', 500)
   }
 }
@@ -128,7 +129,7 @@ const login = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en login:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en login')
     return sendError(res, 'Error en el login', 500)
   }
 }
@@ -187,7 +188,7 @@ const refreshToken = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en refreshToken:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en refreshToken')
     return sendError(res, 'Error al renovar token', 500)
   }
 }
@@ -207,7 +208,7 @@ const logout = async (req, res) => {
 
     return sendSuccess(res, null, 'Sesión cerrada correctamente', 200)
   } catch (error) {
-    console.error('Error en logout:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en logout')
     return sendError(res, 'Error al cerrar sesión', 500)
   }
 }
@@ -282,7 +283,7 @@ const actualizarPerfil = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en actualizarPerfil:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en actualizarPerfil')
     return sendError(res, 'Error al actualizar perfil', 500)
   }
 }
@@ -343,7 +344,7 @@ const cambiarPassword = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en cambiarPassword:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en cambiarPassword')
     return sendError(res, 'Error al cambiar contraseña', 500)
   }
 }
@@ -367,7 +368,7 @@ const obtenerPerfil = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en obtenerPerfil:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerPerfil')
     return sendError(res, 'Error al obtener perfil', 500)
   }
 }

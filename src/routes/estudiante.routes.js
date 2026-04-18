@@ -11,7 +11,8 @@ const {
 } = require('../controllers/estudiante.controller')
 const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
 const {
-  validateEstudiante,
+  validateEstudianteCrear,
+  validateEstudianteActualizar,
   validateUUIDParam,
   handleValidationErrors,
 } = require('../utils/validators')
@@ -33,7 +34,7 @@ router.post(
   requirePermission('estudiante', 'crear', {
     institucionIdResolver: (req) => req.body.institucion_id,
   }),
-  validateEstudiante,
+  validateEstudianteCrear,
   handleValidationErrors,
   crearEstudiante,
 )
@@ -43,7 +44,7 @@ router.put(
   cargarInstitucionesUsuario,
   requirePermission('estudiante', 'actualizar'),
   validateUUIDParam('id'),
-  validateEstudiante,
+  validateEstudianteActualizar,
   handleValidationErrors,
   actualizarEstudiante,
 )

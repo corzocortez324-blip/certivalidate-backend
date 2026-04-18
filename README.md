@@ -8,14 +8,15 @@ API REST para emisión y verificación de certificados digitales con hash SHA-25
 
 - [Requisitos](#requisitos)
 - [Instalación](#instalación)
+- [Docker](#docker)
 - [Configuración](#configuración)
 - [Arquitectura de conexión](#arquitectura-de-conexión)
+- [Documentación interactiva](#documentación-interactiva)
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Seguridad](#seguridad)
 - [Endpoints](#endpoints)
 - [Formato de respuestas](#formato-de-respuestas)
 - [Ejemplos de uso](#ejemplos-de-uso)
-- [Notas importantes](#notas-importantes)
 
 ---
 
@@ -42,21 +43,32 @@ cd certivalidate-backend
 npm install
 ```
 
+> `postinstall` ejecuta `prisma generate` automáticamente. Si lo omitiste, corre `npx prisma generate` manualmente.
+
 **3. Configurar variables de entorno**
 
 ```bash
 cp .env.example .env
 ```
 
-Edita `.env` con tus credenciales reales.
+Edita `.env` con tus credenciales reales. Consulta la tabla de variables más abajo.
 
 **4. Aplicar migraciones**
 
 ```bash
-npx prisma migrate deploy
+npm run migrate
 ```
 
-**5. Poblar datos iniciales**
+> Para desarrollo con migraciones interactivas usa `npm run migrate:dev`.  
+> Si tu red bloquea el puerto 5432 (DIRECT_URL), ejecuta las migraciones desde el SQL Editor de Supabase o desde datos móviles.
+
+**5. Generar cliente Prisma** *(solo si no corrió con npm install)*
+
+```bash
+npx prisma generate
+```
+
+**6. Poblar datos iniciales**
 
 ```bash
 npm run seed
@@ -64,12 +76,52 @@ npm run seed
 
 Crea los roles (admin, editor, lector) y los 18 permisos del sistema. Debe ejecutarse al menos una vez antes de crear usuarios.
 
-**6. Iniciar el servidor**
+**7. Iniciar el servidor**
 
 ```bash
-npm run dev   # desarrollo
-npm start     # producción
+npm run dev   # desarrollo (nodemon + pino-pretty)
+npm start     # producción (logs JSON estructurados)
 ```
+
+---
+
+## Docker
+
+Para levantar el backend con su propia base de datos PostgreSQL sin instalar nada localmente:
+
+**1. Crear el archivo de entorno**
+
+```bash
+cp .env.example .env
+```
+
+Edita `.env` y configura al menos `JWT_SECRET` y `JWT_REFRESH_SECRET`. Las variables `DATABASE_URL` y `DIRECT_URL` las sobreescribe Docker Compose automáticamente.
+
+**2. Levantar los servicios**
+
+```bash
+docker compose up --build
+```
+
+Esto inicia:
+- `db` — PostgreSQL 16 en `localhost:5432`
+- `api` — servidor Node.js en `localhost:3000` (espera a que la BD esté lista)
+
+**3. Aplicar migraciones y seed** *(primera vez)*
+
+```bash
+docker compose exec api npx prisma migrate deploy
+docker compose exec api node prisma/seed.js
+```
+
+**4. Detener**
+
+```bash
+docker compose down          # conserva los datos
+docker compose down -v       # elimina también el volumen de datos
+```
+
+> La imagen de producción no incluye devDependencies, tests ni archivos `.env`. El build usa caché de capas: si solo cambias `src/`, la capa de `npm ci` no se reconstruye.
 
 ---
 
@@ -108,11 +160,26 @@ El proyecto usa Prisma 7, que requiere configuración explícita de la capa de c
 
 ---
 
+## Documentación interactiva
+
+La API incluye una especificación OpenAPI 3.0.3 completa. Con el servidor corriendo, abre:
+
+```
+http://localhost:3000/api/docs
+```
+
+Swagger UI muestra todos los endpoints, esquemas de request/response, códigos de error y permite probar llamadas directamente desde el navegador.
+
+El archivo fuente está en [src/docs/openapi.yaml](src/docs/openapi.yaml).
+
+---
+
 ## Estructura del proyecto
 
 ```
 src/
-  index.js                    Entrada principal, middlewares globales, arranque
+  index.js                    Entrada principal: carga env, arranca servidor, signal handlers
+  app.js                      Configuración Express: middlewares, rutas, error handler
   controllers/
     auth.controller.js        Registro, login, logout, perfil, tokens
     certificado.controller.js Emisión, verificación, revocación, descarga PDF
@@ -123,8 +190,10 @@ src/
   routes/                     Define las rutas y aplica middlewares por endpoint
   middlewares/
     auth.middleware.js        Verifica JWT y que el usuario esté activo en DB
+    requestId.middleware.js   Propaga o genera X-Request-ID por solicitud
   utils/
-    env.js                    Lectura segura de variables de entorno
+    env.js                    Validación de variables de entorno al arranque
+    logger.js                 Instancia pino con pino-pretty en desarrollo
     token.service.js          Lógica de refresh tokens (crear, rotar, revocar)
     authorization.js          RBAC: requirePermission() y consulta de permisos
     auditoria.js              Registro de operaciones en tabla Auditoria
@@ -133,11 +202,19 @@ src/
     pdf.generator.js          Generación de PDF con pdfkit
     roles.js                  Utilidad para obtener roles por nombre
     prisma.js                 Instancia única del cliente Prisma
+  docs/
+    openapi.yaml              Especificación OpenAPI 3.0.3 completa
 prisma/
   schema.prisma               Definición de modelos
   seed.js                     Carga inicial de roles y permisos
   migrations/                 Historial de migraciones SQL
 prisma.config.ts              Configuración de CLI de Prisma
+tests/
+  auth.test.js                Tests de registro, login, refresh, logout, perfil
+  authorization.test.js       Tests de aislamiento cross-institución
+  certificado.public.test.js  Tests de verificación pública sin auth
+  helpers/db.js               Helpers para crear y limpiar datos de test
+  setup-env.js                Carga .env y fija NODE_ENV=test
 ```
 
 ---
@@ -241,7 +318,8 @@ Cada usuario tiene un rol por institución. Los permisos se verifican en cada en
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| GET | `/health` | Público | Estado del servidor y timestamp |
+| GET | `/health` | Público | Estado del servidor, DB, uptime y versión |
+| GET | `/api/docs` | Público | Documentación interactiva Swagger UI |
 
 ---
 

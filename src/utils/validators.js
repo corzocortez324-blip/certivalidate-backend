@@ -105,7 +105,29 @@ const validateRevocacion = [
     .withMessage('motivo_detalle no puede exceder 500 caracteres'),
 ]
 
-const validateInstitucion = [
+// Para POST /instituciones — nombre obligatorio
+const validateInstitucionCrear = [
+  body('nombre')
+    .trim()
+    .notEmpty()
+    .withMessage('El nombre de la institución es obligatorio')
+    .isLength({ min: 3 })
+    .withMessage('El nombre debe tener al menos 3 caracteres'),
+  body('dominio')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ min: 3 })
+    .withMessage('El dominio debe tener al menos 3 caracteres'),
+  body('logo_url')
+    .optional({ nullable: true })
+    .trim()
+    .isURL()
+    .withMessage('logo_url debe ser una URL válida'),
+  body('activa').optional().isBoolean().withMessage('activa debe ser booleano'),
+]
+
+// Para PUT /instituciones/:id — todos opcionales (actualización parcial)
+const validateInstitucionActualizar = [
   body('nombre')
     .optional({ values: 'falsy' })
     .trim()
@@ -124,7 +146,42 @@ const validateInstitucion = [
   body('activa').optional().isBoolean().withMessage('activa debe ser booleano'),
 ]
 
-const validateEstudiante = [
+// Para POST /estudiantes — campos obligatorios enforced en el validator
+const validateEstudianteCrear = [
+  body('institucion_id')
+    .trim()
+    .notEmpty()
+    .withMessage('institucion_id es obligatorio')
+    .isUUID()
+    .withMessage('institucion_id debe ser un UUID válido'),
+  body('nombre')
+    .trim()
+    .notEmpty()
+    .withMessage('El nombre es obligatorio')
+    .isLength({ min: 2 })
+    .withMessage('El nombre debe tener al menos 2 caracteres'),
+  body('apellido')
+    .trim()
+    .notEmpty()
+    .withMessage('El apellido es obligatorio')
+    .isLength({ min: 2 })
+    .withMessage('El apellido debe tener al menos 2 caracteres'),
+  body('documento')
+    .trim()
+    .notEmpty()
+    .withMessage('El documento es obligatorio')
+    .isLength({ min: 4 })
+    .withMessage('El documento debe tener al menos 4 caracteres'),
+  body('email')
+    .optional({ nullable: true })
+    .trim()
+    .isEmail()
+    .withMessage('Debe ser un email válido')
+    .normalizeEmail(),
+]
+
+// Para PUT /estudiantes/:id — todos opcionales (actualización parcial)
+const validateEstudianteActualizar = [
   body('institucion_id')
     .optional()
     .trim()
@@ -208,8 +265,10 @@ module.exports = {
   validateRefreshToken,
   validateCertificado,
   validateRevocacion,
-  validateInstitucion,
-  validateEstudiante,
+  validateInstitucionCrear,
+  validateInstitucionActualizar,
+  validateEstudianteCrear,
+  validateEstudianteActualizar,
   validatePlantilla,
   validateUUIDParam,
   handleValidationErrors,

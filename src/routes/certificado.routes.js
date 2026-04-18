@@ -50,6 +50,7 @@ router.get(
 router.get(
   '/:id/verificaciones',
   verificarToken,
+  cargarInstitucionesUsuario,
   requirePermission('certificado', 'ver'),
   validateUUIDParam('id'),
   handleValidationErrors,

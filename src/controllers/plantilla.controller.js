@@ -1,5 +1,6 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
+const logger = require('../utils/logger')
 
 // Listar plantillas activas
 const listarPlantillas = async (req, res) => {
@@ -25,7 +26,7 @@ const listarPlantillas = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en listarPlantillas:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en listarPlantillas')
     return sendError(res, 'Error al listar plantillas', 500)
   }
 }
@@ -55,7 +56,7 @@ const obtenerPlantilla = async (req, res) => {
 
     return sendSuccess(res, plantilla, 'Plantilla obtenida correctamente', 200)
   } catch (error) {
-    console.error('Error en obtenerPlantilla:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerPlantilla')
     return sendError(res, 'Error al obtener plantilla', 500)
   }
 }
@@ -108,7 +109,7 @@ const crearPlantilla = async (req, res) => {
       201,
     )
   } catch (error) {
-    console.error('Error en crearPlantilla:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en crearPlantilla')
     return sendError(res, 'Error al crear plantilla', 500)
   }
 }
@@ -178,7 +179,7 @@ const actualizarPlantilla = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en actualizarPlantilla:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en actualizarPlantilla')
     return sendError(res, 'Error al actualizar plantilla', 500)
   }
 }

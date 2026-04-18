@@ -1,5 +1,6 @@
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
+const logger = require('../utils/logger')
 
 // Listar estudiantes con paginación
 const listarEstudiantes = async (req, res) => {
@@ -68,7 +69,7 @@ const listarEstudiantes = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en listarEstudiantes:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en listarEstudiantes')
     return sendError(res, 'Error al listar estudiantes', 500)
   }
 }
@@ -107,7 +108,7 @@ const obtenerEstudiante = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en obtenerEstudiante:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerEstudiante')
     return sendError(res, 'Error al obtener estudiante', 500)
   }
 }
@@ -160,7 +161,7 @@ const crearEstudiante = async (req, res) => {
       201,
     )
   } catch (error) {
-    console.error('Error en crearEstudiante:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en crearEstudiante')
     return sendError(res, 'Error al crear estudiante', 500)
   }
 }
@@ -237,7 +238,7 @@ const actualizarEstudiante = async (req, res) => {
       200,
     )
   } catch (error) {
-    console.error('Error en actualizarEstudiante:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en actualizarEstudiante')
     return sendError(res, 'Error al actualizar estudiante', 500)
   }
 }
@@ -285,7 +286,7 @@ const eliminarEstudiante = async (req, res) => {
 
     return sendSuccess(res, null, 'Estudiante eliminado correctamente', 200)
   } catch (error) {
-    console.error('Error en eliminarEstudiante:', error)
+    logger.error({ err: error, requestId: req.requestId }, 'Error en eliminarEstudiante')
     return sendError(res, 'Error al eliminar estudiante', 500)
   }
 }
