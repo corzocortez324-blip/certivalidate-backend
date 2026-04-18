@@ -6,6 +6,7 @@ const prisma = require('./utils/prisma')
 const app = require('./app')
 
 const PORT = process.env.PORT || 3000
+let server
 
 try {
   validateRequiredEnv()
@@ -16,15 +17,33 @@ try {
 
 async function main() {
   await prisma.$connect()
-  app.listen(PORT, () => {
-    logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'CertiValidate API v1.1.0 iniciada')
+  server = app.listen(PORT, () => {
+    logger.info(
+      { port: PORT, env: process.env.NODE_ENV || 'development' },
+      'CertiValidate API v1.1.0 iniciada',
+    )
   })
 }
 
 async function shutdown(signal) {
-  logger.info({ signal }, 'Cerrando servidor...')
-  await prisma.$disconnect()
-  process.exit(0)
+  try {
+    logger.info({ signal }, 'Cerrando servidor...')
+
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close((err) => {
+          if (err) return reject(err)
+          resolve()
+        })
+      })
+    }
+
+    await prisma.$disconnect()
+    process.exit(0)
+  } catch (err) {
+    logger.error({ err, signal }, 'Error durante el apagado del servidor')
+    process.exit(1)
+  }
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'))

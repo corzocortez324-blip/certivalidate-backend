@@ -12,7 +12,7 @@
     "migrate:dev": "dotenv -e .env -- prisma migrate dev",
     "migrate:reset": "dotenv -e .env -- prisma migrate reset",
     "lint": "eslint src/",
-    "test": "jest --testPathIgnorePatterns=node_modules"
+    "test": "jest --runInBand --detectOpenHandles --testPathIgnorePatterns=node_modules"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

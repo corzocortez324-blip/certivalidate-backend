@@ -4,33 +4,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://certivalidate:certivalidate@db:5432/certivalidate
-      DIRECT_URL: postgresql://certivalidate:certivalidate@db:5432/certivalidate
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      PUBLIC_VERIFY_URL: ${PUBLIC_VERIFY_URL:-http://localhost:3000/verificar}
+      DATABASE_URL: postgresql://postgres.fughlfhurpnawjstlwjb:E9xjrAyvl0CKoXno@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+      DIRECT_URL: postgresql://postgres.fughlfhurpnawjstlwjb:E9xjrAyvl0CKoXno@aws-1-us-east-1.pooler.supabase.com:5432/postgres
+      JWT_SECRET: 7832162c959e31216e96d5dbaedee3b0152cab0cdd9078c98f7c6e1838b0705343e3c796ce3f0f01ed599d8a8cddbb89
+      JWT_REFRESH_SECRET: f57c7a143013ab3b31337594dbad3af7610511c6f621bbc697dd05f1d17518226961131824dc9ee97fab9127e1cd37
+      ENCRYPTION_KEY: abb04ce9fef537eeac77abb742680b31cba85c7b2baec4d13e904b3f20a2a80b
+      FRONTEND_URL: http://localhost:5173
+      PUBLIC_VERIFY_URL: http://localhost:3000/api/certificados/verificar
+      LOG_LEVEL: info
+      ENABLE_SWAGGER: false
       NODE_ENV: production
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
-
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: certivalidate
-      POSTGRES_PASSWORD: certivalidate
-      POSTGRES_DB: certivalidate
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U certivalidate"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  pgdata:

@@ -98,8 +98,18 @@ const validateRevocacion = [
     .trim()
     .notEmpty()
     .withMessage('motivo_codigo es obligatorio')
-    .isIn(['FRAUDE', 'ERROR_DATOS', 'DECISION_INSTITUCIONAL', 'DUPLICADO', 'CADUCIDAD', 'OTRO'])
-    .withMessage('motivo_codigo debe ser uno de: FRAUDE, ERROR_DATOS, DECISION_INSTITUCIONAL, DUPLICADO, CADUCIDAD, OTRO'),
+    .isIn([
+      'FRAUDE',
+      'ERROR_DATOS',
+      'ERROR_EMISION',
+      'DECISION_INSTITUCIONAL',
+      'DUPLICADO',
+      'CADUCIDAD',
+      'OTRO',
+    ])
+    .withMessage(
+      'motivo_codigo debe ser uno de: FRAUDE, ERROR_DATOS, ERROR_EMISION, DECISION_INSTITUCIONAL, DUPLICADO, CADUCIDAD, OTRO'
+    ),
   body('motivo_detalle')
     .optional()
     .trim()

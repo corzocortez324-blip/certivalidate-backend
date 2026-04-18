@@ -1,6 +1,5 @@
 const request = require('supertest')
 const app = require('../src/app')
-const prisma = require('../src/utils/prisma')
 const { cleanupTestData, TEST_PREFIX } = require('./helpers/db')
 
 const BASE = '/api/auth'
@@ -10,7 +9,6 @@ const PASSWORD = 'TestPass123'
 
 afterAll(async () => {
   await cleanupTestData()
-  await prisma.$disconnect()
 })
 
 describe('POST /api/auth/register', () => {

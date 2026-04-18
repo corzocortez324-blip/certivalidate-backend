@@ -5,7 +5,6 @@
  */
 const request = require('supertest')
 const app = require('../src/app')
-const prisma = require('../src/utils/prisma')
 const {
   cleanupTestData,
   createTestUser,
@@ -64,7 +63,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await cleanupTestData()
-  await prisma.$disconnect()
 })
 
 // ─── Estudiantes ───────────────────────────────────────────────────────────────
