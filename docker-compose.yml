@@ -3,15 +3,17 @@ services:
     build: .
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://postgres.fughlfhurpnawjstlwjb:E9xjrAyvl0CKoXno@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
-      DIRECT_URL: postgresql://postgres.fughlfhurpnawjstlwjb:E9xjrAyvl0CKoXno@aws-1-us-east-1.pooler.supabase.com:5432/postgres
-      JWT_SECRET: 7832162c959e31216e96d5dbaedee3b0152cab0cdd9078c98f7c6e1838b0705343e3c796ce3f0f01ed599d8a8cddbb89
-      JWT_REFRESH_SECRET: f57c7a143013ab3b31337594dbad3af7610511c6f621bbc697dd05f1d17518226961131824dc9ee97fab9127e1cd37
-      ENCRYPTION_KEY: abb04ce9fef537eeac77abb742680b31cba85c7b2baec4d13e904b3f20a2a80b
-      FRONTEND_URL: http://localhost:5173
-      PUBLIC_VERIFY_URL: http://localhost:3000/api/certificados/verificar
-      LOG_LEVEL: info
-      ENABLE_SWAGGER: false
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
+      PUBLIC_VERIFY_URL: ${PUBLIC_VERIFY_URL}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       NODE_ENV: production
     restart: unless-stopped
