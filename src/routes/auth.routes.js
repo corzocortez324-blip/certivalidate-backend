@@ -11,7 +11,7 @@ const {
   cambiarPassword,
   verificarEmail,
 } = require('../controllers/auth.controller')
-const verificarToken = require('../middlewares/auth.middleware')
+const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
 const {
   validateRegister,
   validateLogin,
@@ -30,6 +30,7 @@ router.get('/perfil', verificarToken, obtenerPerfil)
 router.put(
   '/perfil',
   verificarToken,
+  requireEmailVerified,
   validateUpdateProfile,
   handleValidationErrors,
   actualizarPerfil,
@@ -37,6 +38,7 @@ router.put(
 router.put(
   '/perfil/password',
   verificarToken,
+  requireEmailVerified,
   validateChangePassword,
   handleValidationErrors,
   cambiarPassword,

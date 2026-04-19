@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const verificarToken = require('../middlewares/auth.middleware')
+const { verificarToken } = require('../middlewares/auth.middleware')
 const {
   emitirCertificado,
   verificarCertificado,
@@ -15,6 +15,7 @@ const {
 const {
   validateCertificado,
   validateRevocacion,
+  validateVerificarCertificado,
   validateUUIDParam,
   handleValidationErrors,
 } = require('../utils/validators')
@@ -85,6 +86,6 @@ router.post(
   revocarCertificado,
 )
 
-router.post('/verificar', verificarCertificado)
+router.post('/verificar', validateVerificarCertificado, handleValidationErrors, verificarCertificado)
 
 module.exports = router

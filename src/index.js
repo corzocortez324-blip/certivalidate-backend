@@ -1,5 +1,8 @@
 require('dotenv').config()
 
+// BigInt no es serializable por JSON.stringify nativo — Auditoria y VerificacionPublica usan BigInt PKs
+BigInt.prototype.toJSON = function () { return this.toString() }
+
 const { validateRequiredEnv } = require('./utils/env')
 const logger = require('./utils/logger')
 const prisma = require('./utils/prisma')

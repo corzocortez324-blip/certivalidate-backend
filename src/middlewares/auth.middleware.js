@@ -68,5 +68,4 @@ const requireEmailVerified = (req, res, next) => {
   next()
 }
 
-module.exports = verificarToken
-module.exports.requireEmailVerified = requireEmailVerified
+module.exports = { verificarToken, requireEmailVerified }

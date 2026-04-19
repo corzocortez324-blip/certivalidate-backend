@@ -241,6 +241,21 @@ const validatePlantilla = [
   body('activa').optional().isBoolean().withMessage('activa debe ser booleano'),
 ]
 
+const validateVerificarCertificado = [
+  body('codigo')
+    .optional()
+    .trim()
+    .isString()
+    .isLength({ min: 1, max: 64 })
+    .withMessage('codigo debe ser una cadena de máximo 64 caracteres'),
+  body('hash')
+    .optional()
+    .trim()
+    .isHexadecimal()
+    .isLength({ min: 64, max: 64 })
+    .withMessage('hash debe ser un hex SHA-256 de 64 caracteres'),
+]
+
 const validateUUIDParam = (name = 'id') => [
   param(name).trim().isUUID().withMessage(`${name} debe ser un UUID válido`),
 ]
@@ -267,6 +282,7 @@ module.exports = {
   validateRefreshToken,
   validateCertificado,
   validateRevocacion,
+  validateVerificarCertificado,
   validateInstitucionCrear,
   validateInstitucionActualizar,
   validateEstudianteCrear,

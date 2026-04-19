@@ -110,7 +110,7 @@ const emitirCertificado = async (req, res) => {
 
       await tx.auditoria.create({
         data: {
-          usuario_id: req.usuario?.id || '',
+          usuario_id: req.usuario.id,
           accion: 'EMITIR_CERTIFICADO',
           entidad: 'Certificado',
           entidad_id: cert.id,
@@ -622,7 +622,7 @@ const revocarCertificado = async (req, res) => {
         tx.revocacion.create({
           data: {
             certificado_id: id,
-            revocado_por: req.usuario?.id || '',
+            revocado_por: req.usuario.id,
             motivo_codigo,
             motivo_detalle: motivo_detalle || null,
             fecha_revocacion: new Date(),
@@ -635,7 +635,7 @@ const revocarCertificado = async (req, res) => {
 
     await registrarAuditoria(
       prisma,
-      req.usuario?.id || '',
+      req.usuario.id,
       'REVOCAR_CERTIFICADO',
       'Certificado',
       id,

@@ -39,10 +39,13 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true)
-      }
-      return callback(new Error('CORS bloqueado'))
+      // Sin Origin: curl, wget, server-to-server, Docker healthcheck — permitir siempre
+      // CORS solo es relevante para browsers, que siempre envían Origin en peticiones cross-origin
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+      const err = new Error('CORS bloqueado')
+      err.statusCode = 403
+      return callback(err)
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -135,11 +138,16 @@ app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && 'body' in err) {
     return sendError(res, 'JSON inválido en el body', 400)
   }
-  logger.error({ err, requestId: req.requestId }, 'Error no manejado')
+  const statusCode = err.statusCode || 500
+  if (statusCode >= 500) {
+    logger.error({ err, requestId: req.requestId }, 'Error interno del servidor')
+  } else {
+    logger.warn({ err: err.message, statusCode, requestId: req.requestId }, 'Petición rechazada')
+  }
   sendError(
     res,
-    process.env.NODE_ENV === 'production' ? 'Error interno del servidor' : err.message,
-    err.statusCode || 500,
+    process.env.NODE_ENV === 'production' && statusCode >= 500 ? 'Error interno del servidor' : err.message,
+    statusCode,
   )
 })
 

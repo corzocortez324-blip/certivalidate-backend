@@ -11,6 +11,8 @@ const logger = pino({
       'req.body.password',
       'req.body.password_actual',
       'req.body.password_nueva',
+      'req.body.currentPassword',
+      'req.body.newPassword',
       'req.body.refreshToken',
       'req.body.token',
       'res.headers["set-cookie"]',

@@ -52,6 +52,8 @@ model UsuarioInstitucion {
   usuario        Usuario     @relation(fields: [usuario_id], references: [id])
 
   @@unique([usuario_id, institucion_id])
+  @@index([usuario_id])
+  @@index([institucion_id])
 }
 
 model Rol {
@@ -106,6 +108,8 @@ model Estudiante {
   created_at     DateTime      @default(now())
   certificados   Certificado[]
   institucion    Institucion   @relation(fields: [institucion_id], references: [id])
+
+  @@index([institucion_id])
 }
 
 model PlantillaCertificado {
@@ -118,6 +122,8 @@ model PlantillaCertificado {
   created_at     DateTime      @default(now())
   certificados   Certificado[]
   institucion    Institucion   @relation(fields: [institucion_id], references: [id])
+
+  @@index([institucion_id])
 }
 
 /// Unicidad de negocio validada a nivel de aplicación en emitirCertificado:
@@ -144,6 +150,11 @@ model Certificado {
   metadata         CertificadoMetadata[]
   revocaciones     Revocacion[]
   verificaciones   VerificacionPublica[]
+
+  @@index([institucion_id])
+  @@index([estudiante_id])
+  @@index([estado])
+  @@index([institucion_id, estado])
 }
 
 /// Modelo planificado — campos dinámicos por certificado (ej. calificación, horas).
@@ -154,6 +165,8 @@ model CertificadoMetadata {
   clave          String
   valor          String
   certificado    Certificado @relation(fields: [certificado_id], references: [id])
+
+  @@index([certificado_id])
 }
 
 model Revocacion {
@@ -165,6 +178,8 @@ model Revocacion {
   fecha_revocacion DateTime
   certificado      Certificado @relation(fields: [certificado_id], references: [id])
   usuario          Usuario     @relation(fields: [revocado_por], references: [id])
+
+  @@index([certificado_id])
 }
 
 model VerificacionPublica {
@@ -175,6 +190,9 @@ model VerificacionPublica {
   resultado      String
   fecha          DateTime    @default(now())
   certificado    Certificado @relation(fields: [certificado_id], references: [id])
+
+  @@index([certificado_id])
+  @@index([fecha])
 }
 
 /// Modelo planificado — anclaje de hashes de certificados en blockchain (Ethereum/Polygon).
@@ -203,6 +221,9 @@ model RefreshToken {
   user_agent    String?
   created_at    DateTime  @default(now())
   usuario       Usuario   @relation(fields: [usuario_id], references: [id])
+
+  @@index([usuario_id, revoked_at])
+  @@index([expires_at])
 }
 
 model Auditoria {
@@ -218,4 +239,8 @@ model Auditoria {
   fecha           DateTime    @default(now())
   institucion     Institucion? @relation(fields: [institucion_id], references: [id])
   usuario         Usuario     @relation(fields: [usuario_id], references: [id])
+
+  @@index([institucion_id, fecha])
+  @@index([entidad, entidad_id])
+  @@index([usuario_id])
 }

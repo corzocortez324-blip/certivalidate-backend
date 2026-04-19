@@ -1,4 +1,15 @@
 services:
+  migrate:
+    build: .
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+    # Corre migraciones una sola vez antes de levantar la API
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+
   api:
     build: .
     ports:
@@ -16,4 +27,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       NODE_ENV: production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped

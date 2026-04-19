@@ -22,7 +22,7 @@ API REST para emisión y verificación de certificados digitales con hash SHA-25
 
 ## Requisitos
 
-- Node.js v18 o superior
+- Node.js v20 o superior
 - npm v9 o superior
 - PostgreSQL — se recomienda Supabase
 
@@ -87,7 +87,7 @@ npm start     # producción (logs JSON estructurados)
 
 ## Docker
 
-Para levantar el backend con su propia base de datos PostgreSQL sin instalar nada localmente:
+El `docker-compose.yml` define dos servicios: `migrate` (aplica migraciones) y `api` (servidor Node.js). La API no arranca hasta que las migraciones completen con éxito.
 
 **1. Crear el archivo de entorno**
 
@@ -95,7 +95,7 @@ Para levantar el backend con su propia base de datos PostgreSQL sin instalar nad
 cp .env.example .env
 ```
 
-Edita `.env` y configura al menos `JWT_SECRET` y `JWT_REFRESH_SECRET`. Las variables `DATABASE_URL` y `DIRECT_URL` las sobreescribe Docker Compose automáticamente.
+Edita `.env` con tus credenciales reales — incluyendo `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET` y `ENCRYPTION_KEY`.
 
 **2. Levantar los servicios**
 
@@ -103,25 +103,23 @@ Edita `.env` y configura al menos `JWT_SECRET` y `JWT_REFRESH_SECRET`. Las varia
 docker compose up --build
 ```
 
-Esto inicia:
-- `db` — PostgreSQL 16 en `localhost:5432`
-- `api` — servidor Node.js en `localhost:3000` (espera a que la BD esté lista)
+Esto ejecuta en orden:
+- `migrate` — aplica `prisma migrate deploy` y termina
+- `api` — servidor Node.js en `localhost:3000` (arranca solo cuando `migrate` finaliza correctamente)
 
-**3. Aplicar migraciones y seed** *(primera vez)*
+**3. Poblar datos iniciales** *(primera vez)*
 
 ```bash
-docker compose exec api npx prisma migrate deploy
-docker compose exec api node prisma/seed.js
+docker compose run --rm api node prisma/seed.js
 ```
 
 **4. Detener**
 
 ```bash
-docker compose down          # conserva los datos
-docker compose down -v       # elimina también el volumen de datos
+docker compose down
 ```
 
-> La imagen de producción no incluye devDependencies, tests ni archivos `.env`. El build usa caché de capas: si solo cambias `src/`, la capa de `npm ci` no se reconstruye.
+> La imagen de producción no incluye devDependencies, tests ni archivos `.env`. El cliente Prisma se genera en build-time (`prisma generate` corre durante `docker build`). Las migraciones corren en un contenedor separado al hacer `docker compose up`, no en cada arranque de la API.
 
 ---
 
@@ -132,14 +130,18 @@ El servidor no arranca si faltan `DATABASE_URL`, `JWT_SECRET` o `JWT_REFRESH_SEC
 | Variable | Ejemplo | Descripción |
 |---|---|---|
 | `PORT` | `3000` | Puerto del servidor (opcional, default 3000) |
-| `NODE_ENV` | `production` | Entorno: development o production |
+| `NODE_ENV` | `production` | Entorno: `development` o `production` |
 | `DATABASE_URL` | `postgresql://...@pooler:6543/postgres` | URL del connection pooler de Supabase (puerto 6543) |
 | `DIRECT_URL` | `postgresql://...@db:5432/postgres` | URL directa para migraciones (puerto 5432) |
 | `JWT_SECRET` | cadena larga aleatoria | Secreto para firmar access tokens |
 | `JWT_REFRESH_SECRET` | cadena larga aleatoria diferente | Secreto para firmar refresh tokens |
 | `JWT_EXPIRES_IN` | `1h` | Duración del access token (opcional, default 1h) |
 | `JWT_REFRESH_EXPIRES_IN` | `7d` | Duración del refresh token (opcional, default 7d) |
-| `FRONTEND_URL` | `http://localhost:5173` | Origen permitido por CORS |
+| `ENCRYPTION_KEY` | 64 caracteres hex | Clave AES-256-GCM para cifrar API keys de integraciones |
+| `FRONTEND_URL` | `http://localhost:5173` | Origen(es) permitido(s) por CORS (separar con coma para múltiples) |
+| `PUBLIC_VERIFY_URL` | `http://localhost:3000/api/certificados/verificar` | URL pública de verificación que aparece en los PDFs generados |
+| `LOG_LEVEL` | `info` | Nivel de log pino: `trace`, `debug`, `info`, `warn`, `error` |
+| `ENABLE_SWAGGER` | `false` | Expone `/api/docs` en producción cuando es `true` |
 
 Para generar secretos seguros:
 
@@ -162,13 +164,15 @@ El proyecto usa Prisma 7, que requiere configuración explícita de la capa de c
 
 ## Documentación interactiva
 
-La API incluye una especificación OpenAPI 3.0.3 completa. Con el servidor corriendo, abre:
+La API incluye una especificación OpenAPI 3.0.3 completa. Con el servidor corriendo en desarrollo, abre:
 
 ```
 http://localhost:3000/api/docs
 ```
 
 Swagger UI muestra todos los endpoints, esquemas de request/response, códigos de error y permite probar llamadas directamente desde el navegador.
+
+> En producción (`NODE_ENV=production`) Swagger UI solo se expone si `ENABLE_SWAGGER=true`.
 
 El archivo fuente está en [src/docs/openapi.yaml](src/docs/openapi.yaml).
 
@@ -181,7 +185,7 @@ src/
   index.js                    Entrada principal: carga env, arranca servidor, signal handlers
   app.js                      Configuración Express: middlewares, rutas, error handler
   controllers/
-    auth.controller.js        Registro, login, logout, perfil, tokens
+    auth.controller.js        Registro, login, logout, perfil, verificación de email, tokens
     certificado.controller.js Emisión, verificación, revocación, descarga PDF
     estudiante.controller.js  CRUD de estudiantes por institución
     institucion.controller.js CRUD de instituciones y estadísticas
@@ -189,7 +193,7 @@ src/
     auditoria.controller.js   Consulta del log de auditoría
   routes/                     Define las rutas y aplica middlewares por endpoint
   middlewares/
-    auth.middleware.js        Verifica JWT y que el usuario esté activo en DB
+    auth.middleware.js        Verifica JWT, usuario activo, y verificación de email
     requestId.middleware.js   Propaga o genera X-Request-ID por solicitud
   utils/
     env.js                    Validación de variables de entorno al arranque
@@ -201,6 +205,8 @@ src/
     response.utils.js         Formato estándar de respuestas JSON
     pdf.generator.js          Generación de PDF con pdfkit
     roles.js                  Utilidad para obtener roles por nombre
+    crypto.js                 Cifrado/descifrado AES-256-GCM para API keys
+    mailer.js                 Envío de emails de verificación (stub en desarrollo)
     prisma.js                 Instancia única del cliente Prisma
   docs/
     openapi.yaml              Especificación OpenAPI 3.0.3 completa
@@ -230,6 +236,12 @@ El sistema usa JWT con dos tokens:
 - **Rotación de refresh tokens** — cada vez que se usa un refresh token se revoca y se emite uno nuevo. Detecta el reuso de tokens robados.
 - **Revocación en cambio de contraseña** — al cambiar la contraseña se invalidan todos los refresh tokens activos del usuario.
 
+### Verificación de email
+
+Al registrarse, el usuario recibe un token de verificación. Ciertos endpoints (actualizar perfil, cambiar contraseña) requieren que el email esté verificado (`email_verificado: true`). El flujo de verificación se activa en `GET /api/auth/verificar-email?token=<token>`.
+
+> En desarrollo, el email no se envía realmente — el token se imprime en los logs del servidor.
+
 ### Control de acceso por roles (RBAC)
 
 Cada usuario tiene un rol por institución. Los permisos se verifican en cada endpoint con `requirePermission(recurso, accion)`.
@@ -243,6 +255,7 @@ Cada usuario tiene un rol por institución. Los permisos se verifican en cada en
 ### Otras medidas
 
 - **Helmet** — headers HTTP de seguridad en todas las respuestas
+- **CORS** — solo permite orígenes configurados en `FRONTEND_URL`; en producción bloquea peticiones sin cabecera `Origin`
 - **Rate limiting** — 100 req/15min generales, 10 en autenticación, 50 en verificación pública
 - **Validación de entrada** — todos los endpoints validan con `express-validator`
 - **Variables obligatorias** — el servidor no arranca si faltan los secrets
@@ -257,18 +270,19 @@ Cada usuario tiene un rol por institución. Los permisos se verifican en cada en
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
 | POST | `/api/auth/register` | Público | Registro de nuevo usuario |
+| GET | `/api/auth/verificar-email?token=` | Público | Verifica el email con el token recibido |
 | POST | `/api/auth/login` | Público | Login — retorna access y refresh token |
 | POST | `/api/auth/refresh` | Público | Renueva access token usando refresh token |
 | POST | `/api/auth/logout` | JWT | Revoca el refresh token activo |
 | GET | `/api/auth/perfil` | JWT | Obtiene datos del usuario autenticado |
-| PUT | `/api/auth/perfil` | JWT | Actualiza nombre, apellido o email |
-| PUT | `/api/auth/perfil/password` | JWT | Cambia la contraseña e invalida todas las sesiones |
+| PUT | `/api/auth/perfil` | JWT + email verificado | Actualiza nombre, apellido o email |
+| PUT | `/api/auth/perfil/password` | JWT + email verificado | Cambia la contraseña e invalida todas las sesiones |
 
 ### Certificados — `/api/certificados`
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| POST | `/api/certificados/verificar` | Público | Verifica un certificado por hash o código único |
+| POST | `/api/certificados/verificar` | Público | Verifica un certificado por hash SHA-256 o código único |
 | POST | `/api/certificados/emitir` | JWT + emitir | Genera un certificado con hash SHA-256 |
 | GET | `/api/certificados/listar` | JWT + listar | Lista certificados con paginación y filtros |
 | GET | `/api/certificados/:id` | JWT + ver | Detalle de un certificado |
@@ -306,20 +320,21 @@ Cada usuario tiene un rol por institución. Los permisos se verifican en cada en
 | GET | `/api/plantillas/:id` | JWT + ver | Detalle de una plantilla |
 | POST | `/api/plantillas` | JWT + crear | Crea una nueva plantilla HTML |
 | PUT | `/api/plantillas/:id` | JWT + actualizar | Actualiza una plantilla existente |
+| DELETE | `/api/plantillas/:id` | JWT + archivar | Archiva (soft delete) una plantilla |
 
 ### Auditoría — `/api/auditoria`
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| GET | `/api/auditoria` | JWT + ver auditoría | Lista el log de operaciones con filtros |
-| GET | `/api/auditoria/:id` | JWT + ver auditoría | Detalle de un registro |
+| GET | `/api/auditoria` | JWT + ver auditoría | Lista el log de operaciones con filtros y paginación |
+| GET | `/api/auditoria/:entidad/:entidad_id` | JWT + ver auditoría | Historial de auditoría de un recurso específico |
 
 ### Sistema
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
 | GET | `/health` | Público | Estado del servidor, DB, uptime y versión |
-| GET | `/api/docs` | Público | Documentación interactiva Swagger UI |
+| GET | `/api/docs` | Dev / `ENABLE_SWAGGER=true` | Documentación interactiva Swagger UI |
 
 ---
 
@@ -383,9 +398,15 @@ curl -X POST http://localhost:3000/api/auth/login \
 **Verificación pública de certificado**
 
 ```bash
+# Por código único
 curl -X POST http://localhost:3000/api/certificados/verificar \
   -H "Content-Type: application/json" \
   -d '{"codigo":"A1B2C3D4E5F6G7H8"}'
+
+# Por hash SHA-256
+curl -X POST http://localhost:3000/api/certificados/verificar \
+  -H "Content-Type: application/json" \
+  -d '{"hash":"abc123...64charsHex"}'
 ```
 
 **Emitir un certificado**
@@ -409,4 +430,3 @@ curl -X POST http://localhost:3000/api/auth/logout \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<refresh_token>"}'
 ```
-

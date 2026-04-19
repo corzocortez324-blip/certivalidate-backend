@@ -36,7 +36,7 @@ const register = async (req, res) => {
       return sendError(res, 'El email ya está registrado', 409)
     }
 
-    const hash = await bcrypt.hash(password, 10)
+    const hash = await bcrypt.hash(password, 12)
     const tokenVerificacion = crypto.randomBytes(32).toString('hex')
     const expira = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
@@ -108,9 +108,6 @@ const login = async (req, res) => {
     if (!passwordValida) {
       return sendError(res, 'Credenciales inválidas', 401)
     }
-
-    getEnv('JWT_SECRET')
-    getEnv('JWT_REFRESH_SECRET')
 
     await prisma.usuario.update({
       where: { id: usuario.id },
