@@ -9,7 +9,6 @@ const enviarEmailVerificacion = async ({ email, nombre, token }) => {
     logger.info({ email, url }, '[DEV] Email de verificación (no enviado por SMTP)')
     return
   }
-  // TODO: integrar nodemailer o Resend aquí cuando haya SMTP configurado
   logger.warn({ email }, 'SMTP no configurado — email de verificación no enviado')
 }
 

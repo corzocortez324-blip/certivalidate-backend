@@ -1,7 +1,5 @@
 const bcrypt = require('bcrypt')
 const prisma = require('../../src/utils/prisma')
-
-// Prefijo único para todo dato creado en tests — facilita el cleanup
 const TEST_PREFIX = '__test__'
 
 const createTestUser = async (emailSuffix, password = 'TestPass123') => {

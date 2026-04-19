@@ -29,7 +29,7 @@ const listarInstituciones = async (req, res) => {
   }
 }
 
-// Obtener institución por ID con conteos (no se incluyen listas completas para evitar respuestas masivas)
+// Obtener institución por ID con conteos
 const obtenerInstitucion = async (req, res) => {
   try {
     const { id } = req.params

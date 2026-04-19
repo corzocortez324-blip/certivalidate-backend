@@ -117,7 +117,6 @@ const validateRevocacion = [
     .withMessage('motivo_detalle no puede exceder 500 caracteres'),
 ]
 
-// Para POST /instituciones — nombre obligatorio
 const validateInstitucionCrear = [
   body('nombre')
     .trim()
@@ -138,7 +137,6 @@ const validateInstitucionCrear = [
   body('activa').optional().isBoolean().withMessage('activa debe ser booleano'),
 ]
 
-// Para PUT /instituciones/:id — todos opcionales (actualización parcial)
 const validateInstitucionActualizar = [
   body('nombre')
     .optional({ values: 'falsy' })
@@ -158,7 +156,6 @@ const validateInstitucionActualizar = [
   body('activa').optional().isBoolean().withMessage('activa debe ser booleano'),
 ]
 
-// Para POST /estudiantes — campos obligatorios enforced en el validator
 const validateEstudianteCrear = [
   body('institucion_id')
     .trim()
@@ -192,7 +189,6 @@ const validateEstudianteCrear = [
     .normalizeEmail(),
 ]
 
-// Para PUT /estudiantes/:id — todos opcionales (actualización parcial)
 const validateEstudianteActualizar = [
   body('institucion_id')
     .optional()

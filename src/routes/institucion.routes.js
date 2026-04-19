@@ -37,8 +37,6 @@ router.get(
   handleValidationErrors,
   obtenerEstadisticasInstitucion,
 )
-// Cualquier usuario autenticado puede crear una institución y queda como admin de ella.
-// No aplica requirePermission porque un usuario nuevo sin instituciones aún no tiene permisos.
 router.post('/', verificarToken, validateInstitucionCrear, handleValidationErrors, crearInstitucion)
 router.put(
   '/:id',

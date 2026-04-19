@@ -1,7 +1,3 @@
-/**
- * Tests del endpoint público POST /api/certificados/verificar
- * No requiere autenticación — lo puede llamar cualquier persona.
- */
 const request = require('supertest')
 const app = require('../src/app')
 const {

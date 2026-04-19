@@ -65,8 +65,6 @@ afterAll(async () => {
   await cleanupTestData()
 })
 
-// ─── Estudiantes ───────────────────────────────────────────────────────────────
-
 describe('Autorización: estudiantes', () => {
   it('usuario A no puede ver estudiante de institución B', async () => {
     const res = await request(app)
@@ -99,8 +97,6 @@ describe('Autorización: estudiantes', () => {
   })
 })
 
-// ─── Plantillas ────────────────────────────────────────────────────────────────
-
 describe('Autorización: plantillas', () => {
   it('usuario A no puede ver plantilla de institución B', async () => {
     const res = await request(app)
@@ -117,8 +113,6 @@ describe('Autorización: plantillas', () => {
     expect(res.status).toBe(403)
   })
 })
-
-// ─── Certificados ──────────────────────────────────────────────────────────────
 
 describe('Autorización: certificados', () => {
   it('usuario A no puede ver certificado de institución B', async () => {
@@ -167,8 +161,6 @@ describe('Autorización: certificados', () => {
   })
 })
 
-// ─── Instituciones ─────────────────────────────────────────────────────────────
-
 describe('Autorización: instituciones', () => {
   it('usuario A no puede ver institución B', async () => {
     const res = await request(app)
@@ -192,8 +184,6 @@ describe('Autorización: instituciones', () => {
     expect(res.status).toBe(403)
   })
 })
-
-// ─── Listar (filtrado correcto) ────────────────────────────────────────────────
 
 describe('Autorización: listados solo muestran recursos propios', () => {
   it('listar certificados no incluye certificados de institución B cuando se autentica como A', async () => {

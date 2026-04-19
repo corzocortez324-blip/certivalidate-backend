@@ -31,7 +31,6 @@ const registrarAuditoria = async (
     })
   } catch (error) {
     logger.error({ err: error }, 'Error registrando auditoría')
-    // No detener el flujo principal por un fallo en auditoría
   }
 }
 

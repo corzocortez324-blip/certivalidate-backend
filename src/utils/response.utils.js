@@ -1,7 +1,3 @@
-/**
- * Utilidades para respuestas consistentes
- */
-
 const sendSuccess = (
   res,
   data,

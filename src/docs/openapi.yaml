@@ -5,13 +5,12 @@ info:
   description: >
     API REST para emisión, verificación y gestión de certificados digitales con hash SHA-256.
 
-
-    ## Autenticación
+    Autenticación
 
     La mayoría de endpoints requieren un JWT en el header `Authorization: Bearer <token>`.
     Los tokens se obtienen en `/api/auth/login` y se renuevan con `/api/auth/refresh`.
 
-    ## Control de acceso
+    Control de acceso
 
     El acceso es por institución. Un usuario solo puede ver y modificar recursos de
     las instituciones a las que pertenece, según su rol (admin, editor, lector).
