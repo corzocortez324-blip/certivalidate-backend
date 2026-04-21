@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { verificarToken } = require('../middlewares/auth.middleware')
+const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
 const {
   emitirCertificado,
   verificarCertificado,
@@ -24,6 +24,7 @@ const { requirePermission, cargarInstitucionesUsuario } = require('../utils/auth
 router.post(
   '/emitir',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'emitir', {
     institucionIdResolver: (req) => req.body.institucion_id,
@@ -35,6 +36,7 @@ router.post(
 router.get(
   '/listar',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'listar'),
   listarCertificados,
@@ -42,6 +44,7 @@ router.get(
 router.get(
   '/descargar/:id',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'descargar'),
   validateUUIDParam('id'),
@@ -51,6 +54,7 @@ router.get(
 router.get(
   '/:id/verificaciones',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'ver'),
   validateUUIDParam('id'),
@@ -60,6 +64,7 @@ router.get(
 router.get(
   '/:id/revocaciones',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'ver'),
   validateUUIDParam('id'),
@@ -69,6 +74,7 @@ router.get(
 router.get(
   '/:id',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'ver'),
   validateUUIDParam('id'),
@@ -78,6 +84,7 @@ router.get(
 router.post(
   '/:id/revocar',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'revocar'),
   validateUUIDParam('id'),

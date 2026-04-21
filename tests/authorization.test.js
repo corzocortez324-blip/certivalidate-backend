@@ -191,7 +191,7 @@ describe('Autorización: listados solo muestran recursos propios', () => {
       .get('/api/certificados/listar')
       .set('Authorization', `Bearer ${tokenA}`)
     expect(res.status).toBe(200)
-    const ids = res.body.data.certificados.map((c) => c.id)
+    const ids = res.body.data.data.map((c) => c.id)
     expect(ids).not.toContain(certificadoB.id)
   })
 
@@ -200,7 +200,7 @@ describe('Autorización: listados solo muestran recursos propios', () => {
       .get('/api/estudiantes')
       .set('Authorization', `Bearer ${tokenA}`)
     expect(res.status).toBe(200)
-    const ids = res.body.data.estudiantes.map((e) => e.id)
+    const ids = res.body.data.data.map((e) => e.id)
     expect(ids).not.toContain(estudianteB.id)
   })
 

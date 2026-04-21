@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { verificarToken } = require('../middlewares/auth.middleware')
+const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
 const {
   listarPlantillas,
   obtenerPlantilla,
@@ -16,10 +16,11 @@ const {
   handleValidationErrors,
 } = require('../utils/validators')
 
-router.get('/', verificarToken, cargarInstitucionesUsuario, requirePermission('plantilla', 'listar'), listarPlantillas)
+router.get('/', verificarToken, requireEmailVerified, cargarInstitucionesUsuario, requirePermission('plantilla', 'listar'), listarPlantillas)
 router.get(
   '/:id',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('plantilla', 'ver'),
   validateUUIDParam('id'),
@@ -29,6 +30,7 @@ router.get(
 router.post(
   '/',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('plantilla', 'crear', {
     institucionIdResolver: (req) => req.body.institucion_id,
@@ -40,6 +42,7 @@ router.post(
 router.put(
   '/:id',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('plantilla', 'actualizar'),
   validateUUIDParam('id'),
@@ -51,6 +54,7 @@ router.put(
 router.delete(
   '/:id',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('plantilla', 'archivar'),
   validateUUIDParam('id'),

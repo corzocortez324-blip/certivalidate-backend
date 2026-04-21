@@ -8,6 +8,7 @@ const { getClientIp } = require('../utils/validators')
 const { getEnv } = require('../utils/env')
 const logger = require('../utils/logger')
 const { enviarEmailVerificacion } = require('../utils/mailer')
+const { obtenerAccesosUsuario } = require('../utils/authorization')
 const {
   buildAccessToken,
   buildRefreshToken,
@@ -19,6 +20,11 @@ const {
 } = require('../utils/token.service')
 
 const getUserAgent = (req) => req.headers['user-agent'] || null
+
+const formatUsuario = (usuario) => {
+  const { password_hash, token_verificacion, token_verificacion_expira, ...datos } = usuario
+  return datos
+}
 
 const register = async (req, res) => {
   try {
@@ -69,11 +75,9 @@ const register = async (req, res) => {
       getClientIp(req),
     )
 
-    const { password_hash: _, token_verificacion: __, token_verificacion_expira: ___, ...usuarioSinPassword } = nuevoUsuario
-
     return sendSuccess(
       res,
-      { ...usuarioSinPassword, email_verificado: false },
+      formatUsuario(nuevoUsuario),
       'Usuario registrado correctamente',
       201,
     )
@@ -109,7 +113,7 @@ const login = async (req, res) => {
       return sendError(res, 'Credenciales inválidas', 401)
     }
 
-    await prisma.usuario.update({
+    const usuarioActualizado = await prisma.usuario.update({
       where: { id: usuario.id },
       data: { ultimo_acceso: new Date() },
     })
@@ -124,16 +128,15 @@ const login = async (req, res) => {
       userAgent: getUserAgent(req),
     })
 
+    const accesos = await obtenerAccesosUsuario(usuario.id)
+
     return sendSuccess(
       res,
       {
         token,
         refreshToken,
-        usuario: {
-          id: usuario.id,
-          nombre: usuario.nombre,
-          email: usuario.email,
-        },
+        usuario: formatUsuario(usuarioActualizado),
+        accesos,
       },
       'Login exitoso',
       200,
@@ -284,14 +287,7 @@ const actualizarPerfil = async (req, res) => {
       getClientIp(req),
     )
 
-    const { password_hash: _, ...usuarioSinPassword } = usuarioActualizado
-
-    return sendSuccess(
-      res,
-      usuarioSinPassword,
-      'Perfil actualizado correctamente',
-      200,
-    )
+    return sendSuccess(res, formatUsuario(usuarioActualizado), 'Perfil actualizado correctamente', 200)
   } catch (error) {
     logger.error({ err: error, requestId: req.requestId }, 'Error en actualizarPerfil')
     return sendError(res, 'Error al actualizar perfil', 500)
@@ -369,14 +365,7 @@ const obtenerPerfil = async (req, res) => {
       return sendError(res, 'Usuario no encontrado', 404)
     }
 
-    const { password_hash: _, ...usuarioSinPassword } = usuario
-
-    return sendSuccess(
-      res,
-      usuarioSinPassword,
-      'Perfil obtenido correctamente',
-      200,
-    )
+    return sendSuccess(res, formatUsuario(usuario), 'Perfil obtenido correctamente', 200)
   } catch (error) {
     logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerPerfil')
     return sendError(res, 'Error al obtener perfil', 500)
@@ -416,6 +405,16 @@ const verificarEmail = async (req, res) => {
   }
 }
 
+const obtenerPermisos = async (req, res) => {
+  try {
+    const accesos = await obtenerAccesosUsuario(req.usuario.id)
+    return sendSuccess(res, { accesos }, 'Accesos obtenidos correctamente', 200)
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerPermisos')
+    return sendError(res, 'Error al obtener permisos', 500)
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -425,4 +424,5 @@ module.exports = {
   actualizarPerfil,
   cambiarPassword,
   verificarEmail,
+  obtenerPermisos,
 }

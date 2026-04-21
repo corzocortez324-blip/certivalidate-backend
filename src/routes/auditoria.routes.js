@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 
-const { verificarToken } = require('../middlewares/auth.middleware')
+const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
 const {
   listarAuditoria,
   obtenerAuditoriaPorEntidad,
@@ -9,10 +9,11 @@ const {
 const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
 const { validateUUIDParam, handleValidationErrors } = require('../utils/validators')
 
-router.get('/', verificarToken, cargarInstitucionesUsuario, requirePermission('auditoria', 'ver'), listarAuditoria)
+router.get('/', verificarToken, requireEmailVerified, cargarInstitucionesUsuario, requirePermission('auditoria', 'ver'), listarAuditoria)
 router.get(
   '/:entidad/:entidad_id',
   verificarToken,
+  requireEmailVerified,
   cargarInstitucionesUsuario,
   requirePermission('auditoria', 'ver'),
   validateUUIDParam('entidad_id'),

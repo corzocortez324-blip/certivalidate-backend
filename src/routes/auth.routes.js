@@ -10,6 +10,7 @@ const {
   actualizarPerfil,
   cambiarPassword,
   verificarEmail,
+  obtenerPermisos,
 } = require('../controllers/auth.controller')
 const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
 const {
@@ -27,6 +28,7 @@ router.post('/login', validateLogin, handleValidationErrors, login)
 router.post('/refresh', validateRefreshToken, handleValidationErrors, refreshToken)
 router.post('/logout', verificarToken, validateRefreshToken, handleValidationErrors, logout)
 router.get('/perfil', verificarToken, obtenerPerfil)
+router.get('/permisos', verificarToken, obtenerPermisos)
 router.put(
   '/perfil',
   verificarToken,

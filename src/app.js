@@ -32,9 +32,13 @@ app.use(
   }),
 )
 
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((origin) => origin.trim())
+
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:4173')
+}
 
 app.use(
   cors({

@@ -45,26 +45,21 @@ const listarEstudiantes = async (req, res) => {
       ]
     }
 
-    const total = await prisma.estudiante.count({ where })
-
-    const estudiantes = await prisma.estudiante.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { created_at: 'desc' },
-    })
+    const [estudiantes, total] = await prisma.$transaction([
+      prisma.estudiante.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.estudiante.count({ where }),
+    ])
 
     const totalPages = Math.max(Math.ceil(total / limit), 1)
 
     return sendSuccess(
       res,
-      {
-        total,
-        page,
-        limit,
-        totalPages,
-        estudiantes,
-      },
+      { data: estudiantes, meta: { total, page, limit, totalPages } },
       'Estudiantes obtenidos correctamente',
       200,
     )

@@ -6,20 +6,31 @@ const logger = require('../utils/logger')
 // Listar instituciones
 const listarInstituciones = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100)
     const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(res, 'No autorizado para ver instituciones', 403)
     }
 
-    const instituciones = await prisma.institucion.findMany({
-      where: { id: { in: institucionIds } },
-      orderBy: { created_at: 'desc' },
-    })
+    const where = { id: { in: institucionIds } }
+
+    const [instituciones, total] = await prisma.$transaction([
+      prisma.institucion.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.institucion.count({ where }),
+    ])
+
+    const totalPages = Math.max(Math.ceil(total / limit), 1)
 
     return sendSuccess(
       res,
-      instituciones,
+      { data: instituciones, meta: { total, page, limit, totalPages } },
       'Instituciones obtenidas correctamente',
       200,
     )

@@ -54,36 +54,26 @@ const listarAuditoria = async (req, res) => {
       where.AND.push({ fecha })
     }
 
-    const total = await prisma.auditoria.count({ where })
-
-    const auditorias = await prisma.auditoria.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { fecha: 'desc' },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nombre: true,
-            apellido: true,
-            email: true,
+    const [auditorias, total] = await prisma.$transaction([
+      prisma.auditoria.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { fecha: 'desc' },
+        include: {
+          usuario: {
+            select: { id: true, nombre: true, apellido: true, email: true },
           },
         },
-      },
-    })
+      }),
+      prisma.auditoria.count({ where }),
+    ])
 
     const totalPages = Math.max(Math.ceil(total / limit), 1)
 
     return sendSuccess(
       res,
-      {
-        total,
-        page,
-        limit,
-        totalPages,
-        auditorias,
-      },
+      { data: auditorias, meta: { total, page, limit, totalPages } },
       'Registros de auditoría obtenidos correctamente',
       200,
     )

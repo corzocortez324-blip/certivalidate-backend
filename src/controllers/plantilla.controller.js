@@ -5,23 +5,34 @@ const logger = require('../utils/logger')
 // Listar plantillas activas
 const listarPlantillas = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100)
     const institucionIds = req.institucionIds
 
     if (institucionIds.length === 0) {
       return sendError(res, 'No autorizado para ver plantillas', 403)
     }
 
-    const plantillas = await prisma.plantillaCertificado.findMany({
-      where: {
-        activa: true,
-        institucion_id: { in: institucionIds },
-      },
-      orderBy: { created_at: 'desc' },
-    })
+    const where = {
+      activa: true,
+      institucion_id: { in: institucionIds },
+    }
+
+    const [plantillas, total] = await prisma.$transaction([
+      prisma.plantillaCertificado.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.plantillaCertificado.count({ where }),
+    ])
+
+    const totalPages = Math.max(Math.ceil(total / limit), 1)
 
     return sendSuccess(
       res,
-      plantillas,
+      { data: plantillas, meta: { total, page, limit, totalPages } },
       'Plantillas obtenidas correctamente',
       200,
     )

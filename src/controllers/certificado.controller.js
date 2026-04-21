@@ -350,31 +350,26 @@ const listarCertificados = async (req, res) => {
       ]
     }
 
-    const total = await prisma.certificado.count({ where })
-
-    const certificados = await prisma.certificado.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { created_at: 'desc' },
-      include: {
-        estudiante: true,
-        plantilla: true,
-        institucion: true,
-      },
-    })
+    const [certificados, total] = await prisma.$transaction([
+      prisma.certificado.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        include: {
+          estudiante: true,
+          plantilla: true,
+          institucion: true,
+        },
+      }),
+      prisma.certificado.count({ where }),
+    ])
 
     const totalPages = Math.max(Math.ceil(total / limit), 1)
 
     return sendSuccess(
       res,
-      {
-        total,
-        page,
-        limit,
-        totalPages,
-        certificados,
-      },
+      { data: certificados, meta: { total, page, limit, totalPages } },
       'Certificados obtenidos correctamente',
       200,
     )
