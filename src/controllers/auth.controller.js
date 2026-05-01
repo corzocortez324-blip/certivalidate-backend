@@ -129,13 +129,17 @@ const login = async (req, res) => {
     })
 
     const accesos = await obtenerAccesosUsuario(usuario.id)
+    const ROL_PRIORIDAD = { admin: 3, editor: 2, lector: 1 }
+    const rolPrincipal = accesos
+      .map((a) => a.rol)
+      .sort((a, b) => (ROL_PRIORIDAD[b] || 0) - (ROL_PRIORIDAD[a] || 0))[0] || null
 
     return sendSuccess(
       res,
       {
         token,
         refreshToken,
-        usuario: formatUsuario(usuarioActualizado),
+        usuario: { ...formatUsuario(usuarioActualizado), rol: rolPrincipal },
         accesos,
       },
       'Login exitoso',
@@ -365,7 +369,13 @@ const obtenerPerfil = async (req, res) => {
       return sendError(res, 'Usuario no encontrado', 404)
     }
 
-    return sendSuccess(res, formatUsuario(usuario), 'Perfil obtenido correctamente', 200)
+    const accesos = await obtenerAccesosUsuario(usuario.id)
+    const ROL_PRIORIDAD = { admin: 3, editor: 2, lector: 1 }
+    const rolPrincipal = accesos
+      .map((a) => a.rol)
+      .sort((a, b) => (ROL_PRIORIDAD[b] || 0) - (ROL_PRIORIDAD[a] || 0))[0] || null
+
+    return sendSuccess(res, { ...formatUsuario(usuario), rol: rolPrincipal }, 'Perfil obtenido correctamente', 200)
   } catch (error) {
     logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerPerfil')
     return sendError(res, 'Error al obtener perfil', 500)
