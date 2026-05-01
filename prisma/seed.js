@@ -33,6 +33,11 @@ const PERMISOS = [
   { recurso: 'plantilla', accion: 'ver' },
   { recurso: 'plantilla', accion: 'listar' },
   { recurso: 'auditoria', accion: 'ver' },
+  { recurso: 'usuario', accion: 'listar' },
+  { recurso: 'usuario', accion: 'ver' },
+  { recurso: 'usuario', accion: 'crear' },
+  { recurso: 'usuario', accion: 'actualizar' },
+  { recurso: 'usuario', accion: 'eliminar' },
 ]
 
 const PERMISOS_POR_ROL = {

@@ -27,6 +27,7 @@ tags:
   - name: Instituciones
   - name: Plantillas
   - name: Auditoría
+  - name: Usuarios
 
 components:
   securitySchemes:
@@ -88,6 +89,17 @@ components:
         activo: { type: boolean }
         ultimo_acceso: { type: string, format: date-time, nullable: true }
         created_at: { type: string, format: date-time }
+
+    UsuarioConRol:
+      allOf:
+        - $ref: '#/components/schemas/Usuario'
+        - type: object
+          properties:
+            rol:
+              type: string
+              enum: [admin, editor, lector]
+              nullable: true
+              description: Rol principal del usuario en la institución
 
     Institucion:
       type: object
@@ -855,3 +867,152 @@ paths:
         '200': { description: Historial de auditoría de la entidad }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ─── Usuarios ────────────────────────────────────────────────────────────────
+
+  /api/usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar usuarios (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Buscar por nombre, apellido o email
+      responses:
+        '200':
+          description: Lista paginada de usuarios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PaginatedResponse'
+                          - type: object
+                            properties:
+                              usuarios:
+                                type: array
+                                items: { $ref: '#/components/schemas/UsuarioConRol' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Usuarios]
+      summary: Crear usuario (solo admin)
+      description: Crea un nuevo usuario y lo asigna a la institución del admin con el rol indicado.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, email, password]
+              properties:
+                nombre:   { type: string, example: Ana }
+                apellido: { type: string, example: Martínez }
+                email:    { type: string, format: email, example: ana@universidad.edu.co }
+                password: { type: string, format: password, minLength: 8 }
+                rol:
+                  type: string
+                  enum: [admin, editor, lector]
+                  default: lector
+      responses:
+        '201':
+          description: Usuario creado correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/UsuarioConRol' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: El email ya está registrado }
+
+  /api/usuarios/{id}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener usuario por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Usuario obtenido correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/UsuarioConRol' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    put:
+      tags: [Usuarios]
+      summary: Actualizar usuario
+      description: Permite cambiar nombre, apellido, email, estado activo y rol.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:   { type: string }
+                apellido: { type: string }
+                email:    { type: string, format: email }
+                activo:   { type: boolean }
+                rol:      { type: string, enum: [admin, editor, lector] }
+      responses:
+        '200':
+          description: Usuario actualizado correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/UsuarioConRol' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: El email ya está en uso }
+
+    delete:
+      tags: [Usuarios]
+      summary: Eliminar usuario (soft delete)
+      description: Marca el usuario como eliminado y lo desactiva. No se puede eliminar la propia cuenta.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200': { description: Usuario eliminado correctamente }
+        '400': { description: No puedes eliminar tu propia cuenta }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
