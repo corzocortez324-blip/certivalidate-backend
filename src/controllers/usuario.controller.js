@@ -3,6 +3,7 @@ const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { getClientIp } = require('../utils/validators')
+const { enviarEmailBienvenida } = require('../utils/mailer')
 const logger = require('../utils/logger')
 
 const formatUsuario = (usuario, rolPrincipal = null) => {
@@ -129,6 +130,11 @@ const crearUsuario = async (req, res) => {
       null,
       JSON.stringify({ nombre, apellido: apellido || '', email, rol }),
       getClientIp(req),
+    )
+
+    // Notificar al nuevo usuario con sus credenciales de acceso
+    enviarEmailBienvenida({ email, nombre, password, rol }).catch((err) =>
+      logger.error({ err, email }, 'Error enviando email de bienvenida'),
     )
 
     return sendSuccess(res, formatUsuario(nuevoUsuario, rol), 'Usuario creado correctamente', 201)
