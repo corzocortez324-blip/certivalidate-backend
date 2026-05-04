@@ -96,6 +96,7 @@ const estudianteRoutes = require('./routes/estudiante.routes')
 const institucionRoutes = require('./routes/institucion.routes')
 const plantillaRoutes = require('./routes/plantilla.routes')
 const auditoriaRoutes = require('./routes/auditoria.routes')
+const usuarioRoutes = require('./routes/usuario.routes')
 
 app.get('/health', async (req, res) => {
   let dbStatus = 'ok'
@@ -129,6 +130,7 @@ app.use('/api/estudiantes', estudianteRoutes)
 app.use('/api/instituciones', institucionRoutes)
 app.use('/api/plantillas', plantillaRoutes)
 app.use('/api/auditoria', auditoriaRoutes)
+app.use('/api/usuarios', usuarioRoutes)
 
 app.get('/', (req, res) => {
   sendSuccess(res, { version: '1.1.0', name: 'CertiValidate API', docs: '/api/docs' }, 'API CertiValidate lista para usar')

@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const { sendSuccess, sendError } = require('../utils/response.utils')
-const generarPDF = require('../utils/pdf.generator')
+const { generarPDF, generarPDFBuffer } = require('../utils/pdf.generator')
+const { enviarEmailCertificado } = require('../utils/mailer')
 const prisma = require('../utils/prisma')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { getClientIp } = require('../utils/validators')
@@ -128,6 +129,14 @@ const emitirCertificado = async (req, res) => {
 
       return cert
     })
+
+    // Notificar al estudiante si tiene email registrado
+    if (estudiante.email) {
+      const certCompleto = { ...certificado, estudiante, institucion, plantilla }
+      enviarEmailCertificado(certCompleto).catch((err) =>
+        logger.error({ err }, 'Error enviando email de certificado'),
+      )
+    }
 
     return sendSuccess(
       res,
@@ -280,8 +289,7 @@ const descargarCertificado = async (req, res) => {
       )
     }
 
-    // Nota: El pdf.generator puede necesitar ser adaptado para las nuevas propiedades (ej. cert.estudiante.nombre en vez de cert.estudiante)
-    generarPDF(cert, res)
+    await generarPDF(cert, res)
   } catch (error) {
     logger.error({ err: error, requestId: req.requestId }, 'Error en descargarCertificado')
     return sendError(res, 'Error al descargar certificado', 500)
