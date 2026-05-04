@@ -1,15 +1,4 @@
 services:
-  migrate:
-    build: .
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      DIRECT_URL: ${DIRECT_URL}
-    # Corre migraciones una sola vez antes de levantar la API
-    command: ["npx", "prisma", "migrate", "deploy"]
-    restart: "no"
-
   api:
     build: .
     ports:
@@ -17,8 +6,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      DIRECT_URL: ${DIRECT_URL}
+      DATABASE_URL: "postgresql://postgres.fughlfhurpnawjstlwjb:trW7nI9QJU2W0Gyq@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+      DIRECT_URL: "postgresql://postgres.fughlfhurpnawjstlwjb:trW7nI9QJU2W0Gyq@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -27,7 +16,4 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       NODE_ENV: production
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     restart: unless-stopped
