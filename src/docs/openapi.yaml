@@ -28,6 +28,8 @@ tags:
   - name: Plantillas
   - name: Auditoría
   - name: Usuarios
+  - name: Admin
+    description: Estadísticas globales del sistema. Solo usuarios autenticados con email verificado.
 
 components:
   securitySchemes:
@@ -78,6 +80,89 @@ components:
             id: { type: string, format: uuid }
             nombre: { type: string }
             email: { type: string, format: email }
+
+    AdminStats:
+      type: object
+      properties:
+        totalEmitidos:
+          type: integer
+          description: Total de certificados emitidos (sin importar estado)
+          example: 500
+        totalValidos:
+          type: integer
+          description: Certificados en estado emitido (no revocados)
+          example: 480
+        totalRevocados:
+          type: integer
+          description: Certificados revocados
+          example: 20
+        tasaValidez:
+          type: number
+          format: float
+          description: Porcentaje de certificados válidos sobre el total
+          example: 96.0
+        verificacionesHoy:
+          type: integer
+          description: Verificaciones públicas realizadas desde el inicio del día
+          example: 15
+        verificacionesSemana:
+          type: integer
+          description: Verificaciones públicas en los últimos 7 días
+          example: 87
+        verificacionesMes:
+          type: integer
+          description: Verificaciones públicas en los últimos 30 días
+          example: 350
+        tendencia:
+          type: array
+          description: Emisiones y verificaciones agrupadas por mes según el período seleccionado
+          items:
+            type: object
+            properties:
+              mes:
+                type: string
+                description: Año y mes en formato YYYY-MM
+                example: "2025-04"
+              emisiones:
+                type: integer
+                example: 80
+              verificaciones:
+                type: integer
+                example: 170
+        topEmisores:
+          type: array
+          description: Top 5 instituciones con más certificados emitidos
+          items:
+            type: object
+            properties:
+              nombre:
+                type: string
+                example: Universidad Central
+              total:
+                type: integer
+                example: 200
+        ultimasRevocaciones:
+          type: array
+          description: Últimas 5 revocaciones registradas
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              motivo_codigo:
+                type: string
+                example: FRAUDE
+              fecha_revocacion:
+                type: string
+                format: date-time
+              codigo_unico:
+                type: string
+                example: ABC123DEF456GHI7
+              titular:
+                type: string
+                nullable: true
+                example: Ana Martínez
 
     Usuario:
       type: object
@@ -1016,3 +1101,80 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Admin ────────────────────────────────────────────────────────────
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: Estadísticas globales del dashboard
+      description: >
+        Devuelve KPIs globales del sistema: totales de certificados, tasa de validez,
+        conteos de verificaciones públicas, tendencia mensual de emisiones y verificaciones,
+        top 5 instituciones emisoras y las últimas 5 revocaciones.
+
+
+        El parámetro `period` controla el rango temporal de la gráfica de tendencia:
+        - `7d` → 1 mes hacia atrás
+        - `30d` → 3 meses (por defecto)
+        - `90d` → 6 meses
+        - `1y` → 12 meses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 1y]
+            default: 30d
+          description: Período para la gráfica de tendencia mensual
+      responses:
+        '200':
+          description: Estadísticas obtenidas correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminStats'
+              example:
+                success: true
+                statusCode: 200
+                message: Operación exitosa
+                data:
+                  totalEmitidos: 500
+                  totalValidos: 480
+                  totalRevocados: 20
+                  tasaValidez: 96.0
+                  verificacionesHoy: 15
+                  verificacionesSemana: 87
+                  verificacionesMes: 350
+                  tendencia:
+                    - mes: "2025-03"
+                      emisiones: 80
+                      verificaciones: 170
+                    - mes: "2025-04"
+                      emisiones: 130
+                      verificaciones: 240
+                    - mes: "2025-05"
+                      emisiones: 95
+                      verificaciones: 210
+                  topEmisores:
+                    - nombre: Universidad Central
+                      total: 200
+                    - nombre: Instituto Técnico Nacional
+                      total: 150
+                  ultimasRevocaciones:
+                    - id: "550e8400-e29b-41d4-a716-446655440000"
+                      motivo_codigo: FRAUDE
+                      fecha_revocacion: "2025-05-03T14:30:00Z"
+                      codigo_unico: ABC123DEF456GHI7
+                      titular: Ana Martínez
+                timestamp: "2025-05-05T10:00:00Z"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { description: Error interno al calcular las estadísticas }
