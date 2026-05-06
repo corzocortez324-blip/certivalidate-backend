@@ -98,6 +98,7 @@ const plantillaRoutes = require('./routes/plantilla.routes')
 const auditoriaRoutes = require('./routes/auditoria.routes')
 const usuarioRoutes = require('./routes/usuario.routes')
 const adminRoutes = require('./routes/admin.routes')
+const rolesRoutes = require('./routes/roles.routes')
 
 app.get('/health', async (req, res) => {
   let dbStatus = 'ok'
@@ -133,6 +134,7 @@ app.use('/api/plantillas', plantillaRoutes)
 app.use('/api/auditoria', auditoriaRoutes)
 app.use('/api/usuarios', usuarioRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/admin/roles', rolesRoutes)
 
 app.get('/', (req, res) => {
   sendSuccess(res, { version: '1.1.0', name: 'CertiValidate API', docs: '/api/docs' }, 'API CertiValidate lista para usar')

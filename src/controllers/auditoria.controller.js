@@ -64,6 +64,9 @@ const listarAuditoria = async (req, res) => {
           usuario: {
             select: { id: true, nombre: true, apellido: true, email: true },
           },
+          institucion: {
+            select: { id: true, nombre: true },
+          },
         },
       }),
       prisma.auditoria.count({ where }),

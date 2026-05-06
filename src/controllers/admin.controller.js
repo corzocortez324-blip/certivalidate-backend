@@ -57,12 +57,12 @@ const getStats = async (req, res) => {
         ORDER BY DATE_TRUNC('month', fecha)
       `,
       prisma.$queryRaw`
-        SELECT i.nombre, COUNT(c.id)::int AS total
-        FROM "Certificado" c
-        JOIN "Institucion" i ON c.institucion_id = i.id
-        WHERE c.deleted_at IS NULL
-        GROUP BY i.id, i.nombre
-        ORDER BY COUNT(c.id) DESC
+        SELECT u.nombre || ' ' || u.apellido AS nombre, COUNT(a.id)::int AS total
+        FROM "Auditoria" a
+        JOIN "Usuario" u ON a.usuario_id = u.id
+        WHERE a.accion = 'EMITIR_CERTIFICADO'
+        GROUP BY u.id, u.nombre, u.apellido
+        ORDER BY COUNT(a.id) DESC
         LIMIT 5
       `,
       prisma.revocacion.findMany({

@@ -131,13 +131,13 @@ components:
                 example: 170
         topEmisores:
           type: array
-          description: Top 5 instituciones con más certificados emitidos
+          description: Top 5 usuarios emisores con más certificados emitidos
           items:
             type: object
             properties:
               nombre:
                 type: string
-                example: Universidad Central
+                example: Ana Martínez
               total:
                 type: integer
                 example: 200
@@ -273,6 +273,11 @@ components:
           schema: { $ref: '#/components/schemas/ApiError' }
     NotFound:
       description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    BadRequest:
+      description: Solicitud inválida
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ApiError' }
@@ -902,6 +907,31 @@ paths:
         '200': { description: Plantilla actualizada }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Plantillas]
+      summary: Archivar plantilla (desactivar)
+      description: >
+        Marca la plantilla como inactiva (`activa: false`). No elimina el registro de la base de datos.
+        Si tiene certificados válidos asociados, se archiva igualmente pero el mensaje de respuesta
+        incluye una advertencia con el número de certificados afectados.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Plantilla archivada correctamente (o con advertencia si tiene certificados activos)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PlantillaCertificado' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/auditoria:
     get:
@@ -1110,7 +1140,7 @@ paths:
       description: >
         Devuelve KPIs globales del sistema: totales de certificados, tasa de validez,
         conteos de verificaciones públicas, tendencia mensual de emisiones y verificaciones,
-        top 5 instituciones emisoras y las últimas 5 revocaciones.
+        top 5 usuarios emisores y las últimas 5 revocaciones.
 
 
         El parámetro `period` controla el rango temporal de la gráfica de tendencia:
@@ -1164,9 +1194,9 @@ paths:
                       emisiones: 95
                       verificaciones: 210
                   topEmisores:
-                    - nombre: Universidad Central
+                    - nombre: Ana Martínez
                       total: 200
-                    - nombre: Instituto Técnico Nacional
+                    - nombre: Carlos López
                       total: 150
                   ultimasRevocaciones:
                     - id: "550e8400-e29b-41d4-a716-446655440000"
@@ -1178,3 +1208,301 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '500': { description: Error interno al calcular las estadísticas }
+
+  # ─── Auth adicionales ────────────────────────────────────────────────────────
+
+  /api/auth/verificar-email:
+    get:
+      tags: [Auth]
+      summary: Verificar dirección de email mediante token
+      description: El token se envía por email al registrarse. Una vez verificado, el usuario puede iniciar sesión.
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+          description: Token de verificación recibido por email
+      responses:
+        '200':
+          description: Email verificado correctamente
+        '400':
+          description: Token de verificación inválido o expirado
+
+  /api/auth/permisos:
+    get:
+      tags: [Auth]
+      summary: Obtener accesos e instituciones del usuario autenticado
+      description: Devuelve los roles e instituciones asociados al usuario actual. Útil para el control de acceso en el frontend.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Accesos obtenidos correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accesos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                institucion_id: { type: string, format: uuid }
+                                rol: { type: string, enum: [admin, editor, lector] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ─── 2FA ─────────────────────────────────────────────────────────────────────
+
+  /api/auth/2fa/setup:
+    get:
+      tags: [Auth]
+      summary: Iniciar configuración de autenticación en dos factores (2FA)
+      description: Genera un secreto TOTP y devuelve un QR en base64 para escanear con una app autenticadora (Google Authenticator, Authy, etc.). El usuario debe llamar a `/api/auth/2fa/enable` con un código válido para activarlo.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: QR y secreto TOTP generados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          qrDataUrl:
+                            type: string
+                            description: Imagen QR en formato data URL (base64 PNG)
+                          secret:
+                            type: string
+                            description: Clave TOTP en texto plano para ingreso manual
+        '400':
+          description: El 2FA ya estaba habilitado
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/2fa/enable:
+    post:
+      tags: [Auth]
+      summary: Activar 2FA confirmando con el primer código TOTP
+      description: Verifica el código generado por la app autenticadora y activa el 2FA en la cuenta. Requiere haber llamado previamente a `/api/auth/2fa/setup`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: Código TOTP de 6 dígitos generado por la app autenticadora
+                  example: "123456"
+      responses:
+        '200':
+          description: 2FA activado correctamente
+        '400':
+          description: Código TOTP inválido, 2FA ya activo o secreto no configurado
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/2fa/disable:
+    post:
+      tags: [Auth]
+      summary: Desactivar 2FA con contraseña y código TOTP
+      description: Requiere la contraseña actual y un código TOTP válido para desactivar el 2FA. Elimina el secreto TOTP almacenado.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password, code]
+              properties:
+                password:
+                  type: string
+                  description: Contraseña actual del usuario
+                code:
+                  type: string
+                  description: Código TOTP de 6 dígitos
+                  example: "654321"
+      responses:
+        '200':
+          description: 2FA desactivado correctamente
+        '400':
+          description: Contraseña o código TOTP inválido, o 2FA no estaba habilitado
+        '401':
+          description: Contraseña incorrecta
+
+  /api/auth/2fa/verify:
+    post:
+      tags: [Auth]
+      summary: Completar inicio de sesión con código 2FA (segundo factor)
+      description: >
+        Cuando el login devuelve `require2FA: true`, el cliente recibe un `partial_token` de corta duración.
+        Este endpoint valida ese token junto al código TOTP y devuelve los tokens de acceso completos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [partial_token, code]
+              properties:
+                partial_token:
+                  type: string
+                  description: Token parcial recibido en el login cuando 2FA está activo
+                code:
+                  type: string
+                  description: Código TOTP de 6 dígitos
+                  example: "789012"
+      responses:
+        '200':
+          description: Login con 2FA exitoso — devuelve tokens de acceso completos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/Tokens'
+                          - type: object
+                            properties:
+                              accesos:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    institucion_id: { type: string, format: uuid }
+                                    rol: { type: string, enum: [admin, editor, lector] }
+        '400':
+          description: Código TOTP inválido o 2FA no configurado
+        '401':
+          description: Token parcial inválido o expirado
+
+  # ─── Roles y Permisos ────────────────────────────────────────────────────────
+
+  /api/admin/roles:
+    get:
+      tags: [Admin]
+      summary: Listar roles con sus permisos actuales y todos los permisos disponibles
+      description: >
+        Devuelve todos los roles del sistema con los permisos que tienen asignados,
+        más la lista completa de permisos disponibles para usar como referencia al editar.
+        Requiere permiso `usuario:listar`.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Roles y permisos obtenidos correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          roles:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:          { type: string, format: uuid }
+                                nombre:      { type: string, example: admin }
+                                descripcion: { type: string, nullable: true }
+                                permisos:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      id:      { type: string, format: uuid }
+                                      clave:   { type: string, example: "certificado:emitir" }
+                                      recurso: { type: string, example: certificado }
+                                      accion:  { type: string, example: emitir }
+                          permisos:
+                            type: array
+                            description: Todos los permisos disponibles en el sistema
+                            items:
+                              type: object
+                              properties:
+                                id:      { type: string, format: uuid }
+                                clave:   { type: string, example: "certificado:emitir" }
+                                recurso: { type: string }
+                                accion:  { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/admin/roles/{rolId}/permisos:
+    put:
+      tags: [Admin]
+      summary: Actualizar permisos de un rol (reemplazo atómico)
+      description: >
+        Reemplaza en una transacción todos los permisos del rol especificado por los IDs
+        indicados en el body. Si `permisoIds` está vacío se quitan todos los permisos,
+        excepto para el rol `admin` que requiere al menos uno.
+        Requiere permiso `usuario:actualizar`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: rolId
+          required: true
+          schema: { type: string, format: uuid }
+          description: ID del rol a modificar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permisoIds]
+              properties:
+                permisoIds:
+                  type: array
+                  description: IDs de los permisos que debe tener el rol
+                  items: { type: string, format: uuid }
+                  example: ["uuid-1", "uuid-2"]
+      responses:
+        '200':
+          description: Permisos del rol actualizados correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:      { type: string, format: uuid }
+                          nombre:  { type: string }
+                          permisos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:    { type: string, format: uuid }
+                                clave: { type: string }
+        '400':
+          description: permisoIds inválido o intento de dejar al rol admin sin permisos
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
