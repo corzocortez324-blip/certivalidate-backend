@@ -12,6 +12,7 @@ const {
   verificarEmail,
   obtenerPermisos,
 } = require('../controllers/auth.controller')
+const { setup2FA, enable2FA, disable2FA, verify2FA } = require('../controllers/twoFactor.controller')
 const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
 const {
   validateRegister,
@@ -45,5 +46,11 @@ router.put(
   handleValidationErrors,
   cambiarPassword,
 )
+
+// Rutas 2FA
+router.get('/2fa/setup', verificarToken, setup2FA)
+router.post('/2fa/enable', verificarToken, enable2FA)
+router.post('/2fa/disable', verificarToken, disable2FA)
+router.post('/2fa/verify', verify2FA)
 
 module.exports = router

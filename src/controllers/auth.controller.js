@@ -12,6 +12,7 @@ const { obtenerAccesosUsuario } = require('../utils/authorization')
 const {
   buildAccessToken,
   buildRefreshToken,
+  buildPartialToken,
   persistRefreshToken,
   verifyStoredRefreshToken,
   rotateRefreshToken,
@@ -22,7 +23,7 @@ const {
 const getUserAgent = (req) => req.headers['user-agent'] || null
 
 const formatUsuario = (usuario) => {
-  const { password_hash, token_verificacion, token_verificacion_expira, ...datos } = usuario
+  const { password_hash, token_verificacion, token_verificacion_expira, totp_secret, ...datos } = usuario
   return datos
 }
 
@@ -111,6 +112,11 @@ const login = async (req, res) => {
 
     if (!passwordValida) {
       return sendError(res, 'Credenciales inválidas', 401)
+    }
+
+    if (usuario.totp_enabled) {
+      const partial_token = buildPartialToken(usuario.id)
+      return sendSuccess(res, { requires2FA: true, partial_token }, 'Se requiere verificación 2FA', 200)
     }
 
     const usuarioActualizado = await prisma.usuario.update({

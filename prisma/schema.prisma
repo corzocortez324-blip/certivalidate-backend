@@ -32,6 +32,8 @@ model Usuario {
   token_verificacion         String?
   token_verificacion_expira  DateTime?
   ultimo_acceso              DateTime?
+  totp_secret                String?
+  totp_enabled               Boolean   @default(false)
   created_at                 DateTime  @default(now())
   updated_at                 DateTime?
   deleted_at                 DateTime?

@@ -128,9 +128,13 @@ const revokeAllUserRefreshTokens = async (usuarioId) =>
     },
   })
 
+const buildPartialToken = (usuarioId) =>
+  jwt.sign({ id: usuarioId, type: 'partial_2fa' }, getEnv('JWT_SECRET'), { expiresIn: '5m' })
+
 module.exports = {
   buildAccessToken,
   buildRefreshToken,
+  buildPartialToken,
   persistRefreshToken,
   verifyStoredRefreshToken,
   rotateRefreshToken,
