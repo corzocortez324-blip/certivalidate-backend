@@ -20,6 +20,7 @@ const {
   handleValidationErrors,
 } = require('../utils/validators')
 const { requirePermission, cargarInstitucionesUsuario } = require('../utils/authorization')
+const { revocacionGuard } = require('../middlewares/revocacion.guard')
 
 router.post(
   '/emitir',
@@ -88,6 +89,8 @@ router.post(
   cargarInstitucionesUsuario,
   requirePermission('certificado', 'revocar'),
   validateUUIDParam('id'),
+  handleValidationErrors,
+  revocacionGuard,
   validateRevocacion,
   handleValidationErrors,
   revocarCertificado,

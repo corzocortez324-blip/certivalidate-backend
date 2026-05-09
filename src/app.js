@@ -72,12 +72,15 @@ const limiterGeneral = rateLimit({
   message: { success: false, statusCode: 429, message: 'Demasiadas solicitudes, inténtalo de nuevo más tarde' },
 })
 
+// Endpoints de credenciales sensibles: login, register, 2fa/verify, 2fa/enable, 2fa/disable
+// Excluye: refresh, logout, perfil (GET), permisos (GET) — no son vectores de fuerza bruta
+const CREDENTIAL_ENDPOINTS = /\/(login|register|2fa\/(verify|enable|disable))$/
 const limiterAuth = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTest,
+  skip: (req) => isTest || !CREDENTIAL_ENDPOINTS.test(req.originalUrl),
   message: { success: false, statusCode: 429, message: 'Demasiadas solicitudes de autenticación, inténtalo de nuevo más tarde' },
 })
 

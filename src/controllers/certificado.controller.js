@@ -581,33 +581,18 @@ const revocarCertificado = async (req, res) => {
   try {
     const { id } = req.params
     const { motivo_codigo, motivo_detalle } = req.body
-
-    if (!id) {
-      return sendError(res, 'ID del certificado es obligatorio', 400)
-    }
-
-    if (!motivo_codigo) {
-      return sendError(res, 'motivo_codigo es obligatorio', 400)
-    }
-
-    const institucionIds = req.institucionIds
-    let estadoAnterior = null
+    // req.certificado y req.nivelRevocacion ya fueron validados por RevocacionGuard
+    const certPrecargado = req.certificado
 
     const [certificadoActualizado] = await prisma.$transaction(async (tx) => {
+      // Re-fetch dentro de la transacción para proteger contra race conditions
       const certificado = await tx.certificado.findFirst({
         where: { id, deleted_at: null },
       })
-      if (certificado) estadoAnterior = certificado.estado
 
       if (!certificado) {
         const err = new Error('Certificado no encontrado')
         err.statusCode = 404
-        throw err
-      }
-
-      if (institucionIds.length === 0 || !institucionIds.includes(certificado.institucion_id)) {
-        const err = new Error('No autorizado para revocar este certificado')
-        err.statusCode = 403
         throw err
       }
 
@@ -634,26 +619,19 @@ const revocarCertificado = async (req, res) => {
       ])
     })
 
-    const ip = getClientIp(req)
-
     await registrarAuditoria(
       prisma,
       req.usuario.id,
       'REVOCAR_CERTIFICADO',
       'Certificado',
       id,
-      JSON.stringify({ estado: estadoAnterior }),
-      JSON.stringify({ estado: 'revocado' }),
-      ip,
+      JSON.stringify({ estado: certPrecargado.estado }),
+      JSON.stringify({ estado: 'revocado', nivel_acceso: req.nivelRevocacion }),
+      getClientIp(req),
       certificadoActualizado.institucion_id,
     )
 
-    return sendSuccess(
-      res,
-      certificadoActualizado,
-      'Certificado revocado correctamente',
-      200,
-    )
+    return sendSuccess(res, certificadoActualizado, 'Certificado revocado correctamente', 200)
   } catch (error) {
     if (error.statusCode) {
       return sendError(res, error.message, error.statusCode)
