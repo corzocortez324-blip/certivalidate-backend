@@ -7,6 +7,14 @@ const { registrarAuditoria } = require('../utils/auditoria')
 const { getClientIp } = require('../utils/validators')
 const logger = require('../utils/logger')
 
+const ofuscarNombre = (nombre, apellido) => {
+  const n = (nombre ?? '').trim()
+  const a = (apellido ?? '').trim()
+  if (!a) return n
+  if (a.length <= 2) return `${n} ${a[0]}***`
+  return `${n} ${a[0]}${'*'.repeat(Math.min(a.length - 2, 3))}${a[a.length - 1]}`
+}
+
 // Crear certificado
 const emitirCertificado = async (req, res) => {
   try {
@@ -163,6 +171,8 @@ const verificarCertificado = async (req, res) => {
       )
     }
 
+    const metodo = hash ? 'hash' : 'codigo'
+
     const cert = await prisma.certificado.findFirst({
       where: hash
         ? { hash_sha256: hash, deleted_at: null }
@@ -171,6 +181,11 @@ const verificarCertificado = async (req, res) => {
         estudiante: true,
         institucion: true,
         plantilla: true,
+        blockchain: {
+          where: { estado: 'confirmado' },
+          orderBy: { confirmado_en: 'desc' },
+          take: 1,
+        },
       },
     })
 
@@ -217,8 +232,11 @@ const verificarCertificado = async (req, res) => {
         ip,
         user_agent: userAgent,
         resultado,
+        metodo,
       },
     })
+
+    const txBlockchain = cert.blockchain?.[0] ?? null
 
     return sendSuccess(
       res,
@@ -229,16 +247,19 @@ const verificarCertificado = async (req, res) => {
         hash_verificado: hashVerificado,
         fecha_emision: cert.fecha_emision,
         fecha_expiracion: cert.fecha_expiracion,
-        estudiante: {
-          nombre: cert.estudiante?.nombre,
-          apellido: cert.estudiante?.apellido,
-        },
-        institucion: {
-          nombre: cert.institucion?.nombre,
-        },
-        plantilla: {
-          nombre: cert.plantilla?.nombre,
-        },
+        titular: ofuscarNombre(cert.estudiante?.nombre, cert.estudiante?.apellido),
+        tipo_certificado: cert.plantilla?.nombre ?? null,
+        institucion: cert.institucion?.nombre ?? null,
+        blockchain: txBlockchain
+          ? {
+              tx_hash: txBlockchain.tx_hash,
+              red: txBlockchain.red,
+              confirmado_en: txBlockchain.confirmado_en,
+              explorador_url: txBlockchain.tx_hash
+                ? `https://polygonscan.com/tx/${txBlockchain.tx_hash}`
+                : null,
+            }
+          : null,
       },
       mensaje,
       200,
@@ -576,6 +597,54 @@ const obtenerRevocaciones = async (req, res) => {
   }
 }
 
+// T-73: Motivo de revocación — solo para admin/emisor de la institución
+const obtenerMotivoRevocacion = async (req, res) => {
+  try {
+    const { id } = req.params
+    const institucionIds = req.instituciones?.map((i) => i.id) ?? []
+
+    const cert = await prisma.certificado.findFirst({
+      where: { id, deleted_at: null },
+      select: { id: true, estado: true, institucion_id: true },
+    })
+
+    if (!cert) return sendError(res, 'Certificado no encontrado', 404)
+    if (!institucionIds.includes(cert.institucion_id))
+      return sendError(res, 'No autorizado para ver este motivo de revocación', 403)
+    if (cert.estado !== 'revocado')
+      return sendError(res, 'El certificado no está revocado', 400)
+
+    const revocacion = await prisma.revocacion.findFirst({
+      where: { certificado_id: id },
+      orderBy: { fecha_revocacion: 'desc' },
+      include: {
+        usuario: { select: { nombre: true, apellido: true } },
+      },
+    })
+
+    if (!revocacion) return sendError(res, 'Datos de revocación no encontrados', 404)
+
+    return sendSuccess(
+      res,
+      {
+        motivo: revocacion.motivo_codigo,
+        motivoCategoria: revocacion.motivo_codigo.replace(/_/g, ' '),
+        motivo_detalle: revocacion.motivo_detalle ?? null,
+        revocadoPor: revocacion.usuario
+          ? `${revocacion.usuario.nombre} ${revocacion.usuario.apellido ?? ''}`.trim()
+          : null,
+        fechaRevocacion: revocacion.fecha_revocacion,
+        txHashRevocacion: null, // pendiente integración blockchain
+      },
+      'Motivo de revocación obtenido correctamente',
+      200,
+    )
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en obtenerMotivoRevocacion')
+    return sendError(res, 'Error al obtener motivo de revocación', 500)
+  }
+}
+
 // Revocar certificado
 const revocarCertificado = async (req, res) => {
   try {
@@ -649,5 +718,6 @@ module.exports = {
   obtenerCertificado,
   obtenerVerificaciones,
   obtenerRevocaciones,
+  obtenerMotivoRevocacion,
   revocarCertificado,
 }

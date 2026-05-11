@@ -41,6 +41,7 @@ model Usuario {
   revocaciones   Revocacion[]
   instituciones  UsuarioInstitucion[]
   refreshTokens  RefreshToken[]
+  sesiones       SesionActiva[]
 }
 
 model UsuarioInstitucion {
@@ -190,11 +191,13 @@ model VerificacionPublica {
   ip             String?
   user_agent     String?
   resultado      String
+  metodo         String?     @default("codigo")
   fecha          DateTime    @default(now())
   certificado    Certificado @relation(fields: [certificado_id], references: [id])
 
   @@index([certificado_id])
   @@index([fecha])
+  @@index([metodo])
 }
 
 /// Modelo planificado — anclaje de hashes de certificados en blockchain (Ethereum/Polygon).
@@ -225,6 +228,31 @@ model RefreshToken {
   usuario       Usuario   @relation(fields: [usuario_id], references: [id])
 
   @@index([usuario_id, revoked_at])
+  @@index([expires_at])
+}
+
+model IntentoLogin {
+  id         String   @id @default(uuid())
+  email      String
+  ip_address String?
+  exitoso    Boolean  @default(false)
+  fecha      DateTime @default(now())
+
+  @@index([email, fecha])
+  @@index([ip_address, fecha])
+}
+
+model SesionActiva {
+  id         String   @id @default(uuid())
+  usuario_id String
+  token_hash String   @unique
+  ip         String?
+  user_agent String?
+  expires_at DateTime
+  created_at DateTime @default(now())
+  usuario    Usuario  @relation(fields: [usuario_id], references: [id])
+
+  @@index([usuario_id])
   @@index([expires_at])
 }
 

@@ -163,6 +163,69 @@ components:
                 type: string
                 nullable: true
                 example: Ana Martínez
+        emisionesDiarias:
+          type: array
+          description: Emisiones por día en los últimos 90 días (tiempo real)
+          items:
+            type: object
+            properties:
+              dia:
+                type: string
+                format: date
+                example: "2026-05-01"
+              total_emitidos:
+                type: integer
+                example: 12
+              total_revocados:
+                type: integer
+                example: 1
+        verificacionesDiarias:
+          type: array
+          description: Verificaciones públicas por día en los últimos 30 días (tiempo real)
+          items:
+            type: object
+            properties:
+              dia:
+                type: string
+                format: date
+                example: "2026-05-01"
+              total:
+                type: integer
+                example: 45
+
+    SesionActiva:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        ip:        { type: string, nullable: true, example: "192.168.1.1" }
+        userAgent: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+
+    MotivoRevocacion:
+      type: object
+      properties:
+        motivo:
+          type: string
+          example: ERROR_EMISION
+        motivoCategoria:
+          type: string
+          example: ERROR EMISION
+        motivo_detalle:
+          type: string
+          nullable: true
+          example: El nombre del estudiante estaba incorrecto
+        revocadoPor:
+          type: string
+          nullable: true
+          example: Ana Martínez
+        fechaRevocacion:
+          type: string
+          format: date-time
+        txHashRevocacion:
+          type: string
+          nullable: true
+          description: Hash de transacción blockchain (null si no está anclado)
 
     Usuario:
       type: object
@@ -493,10 +556,16 @@ paths:
                   codigo_unico: A1B2C3D4
                   estado: valido
                   mensaje: Certificado verificado correctamente
+                  hash_verificado: true
                   fecha_emision: "2026-04-01T00:00:00Z"
-                  estudiante: { nombre: Juan, apellido: Pérez }
-                  institucion: { nombre: Universidad Cesar }
+                  fecha_expiracion: null
+                  titular: "Juan P***z"
+                  tipo_certificado: Técnico en Sistemas
+                  institucion: Universidad Cesar
+                  blockchain: null
         '400': { description: Se requiere código o hash }
+        '409': { description: Integridad del certificado comprometida (hash no coincide) }
+        '429': { description: Demasiadas solicitudes — rate limit 50 req/15min }
 
   /api/certificados/emitir:
     post:
@@ -1506,3 +1575,236 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─── Sesiones activas ────────────────────────────────────────────────────────
+
+  /api/auth/sesiones:
+    get:
+      tags: [Auth]
+      summary: Listar sesiones activas del usuario autenticado
+      description: Devuelve todas las sesiones vigentes (no expiradas) del usuario. Útil para el panel de seguridad en Mi Perfil.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de sesiones activas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sesiones:
+                            type: array
+                            items: { $ref: '#/components/schemas/SesionActiva' }
+              example:
+                data:
+                  sesiones:
+                    - id: "uuid-1"
+                      ip: "190.24.12.4"
+                      userAgent: "Mozilla/5.0 Chrome/124"
+                      createdAt: "2026-05-10T08:00:00Z"
+                      expiresAt: "2026-05-17T08:00:00Z"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/sesiones/todas:
+    delete:
+      tags: [Auth]
+      summary: Cerrar todas las sesiones activas del usuario
+      description: Elimina todas las sesiones activas. Útil para revocar acceso desde todos los dispositivos tras un cambio de contraseña o sospecha de compromiso.
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Todas las sesiones cerradas correctamente }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/sesiones/{id}:
+    delete:
+      tags: [Auth]
+      summary: Revocar una sesión activa específica
+      description: Elimina una sesión activa por su ID. Solo el propietario puede revocar sus propias sesiones.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+          description: ID de la sesión a revocar
+      responses:
+        '200': { description: Sesión revocada correctamente }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─── Certificados — motivo de revocación (T-73) ──────────────────────────────
+
+  /api/certificados/{id}/revocacion:
+    get:
+      tags: [Certificados]
+      summary: Obtener motivo de revocación de un certificado
+      description: >
+        Devuelve el detalle del motivo por el que fue revocado un certificado.
+        Solo accesible para admin o emisor de la misma institución.
+        El portal público **no** tiene acceso a este endpoint por privacidad institucional.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Motivo de revocación obtenido correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/MotivoRevocacion' }
+              example:
+                data:
+                  motivo: ERROR_EMISION
+                  motivoCategoria: ERROR EMISION
+                  motivo_detalle: El nombre del estudiante estaba incorrecto al momento de emitir
+                  revocadoPor: Ana Martínez
+                  fechaRevocacion: "2026-05-10T14:30:00Z"
+                  txHashRevocacion: null
+        '400': { description: El certificado no está revocado }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─── Admin — nuevos endpoints ─────────────────────────────────────────────────
+
+  /api/admin/stats/mv:
+    get:
+      tags: [Admin]
+      summary: Estadísticas desde vistas materializadas (para reportes y exportaciones)
+      description: >
+        Lee las tres vistas materializadas en una sola consulta. Los datos se actualizan
+        automáticamente mediante `pg_cron`: certificados cada hora, emisiones a las 2 AM UTC,
+        verificaciones a las 3 AM UTC. Usar para exportación de reportes ejecutivos,
+        **no** para el dashboard en tiempo real.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Estadísticas desde vistas materializadas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          certificados:
+                            type: object
+                            properties:
+                              total_emitidos:   { type: integer, example: 500 }
+                              total_vigentes:   { type: integer, example: 480 }
+                              total_revocados:  { type: integer, example: 20 }
+                              tasa_validez:     { type: number, example: 96.0 }
+                              top_instituciones:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    institucion_id: { type: string, format: uuid }
+                                    nombre:         { type: string }
+                                    total:          { type: integer }
+                              actualizado_en: { type: string, format: date-time }
+                          emisiones:
+                            type: array
+                            description: Emisiones diarias (últimos 90 días)
+                            items:
+                              type: object
+                              properties:
+                                dia:             { type: string, format: date }
+                                total_emitidos:  { type: integer }
+                                total_revocados: { type: integer }
+                          verificaciones:
+                            type: object
+                            properties:
+                              total_verificaciones: { type: integer }
+                              por_estado:  { type: object }
+                              por_metodo:  { type: object }
+                              por_dia:     { type: array, items: { type: object } }
+                              tasa_validos: { type: number }
+                              actualizado_en: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { description: Error al consultar las vistas materializadas }
+
+  /api/admin/revocaciones/motivos:
+    get:
+      tags: [Admin]
+      summary: Reporte de motivos frecuentes de revocación (T-76)
+      description: >
+        Agrupa todas las revocaciones por `motivo_codigo` y devuelve conteo y porcentaje
+        para cada categoría. Soporta filtros opcionales por institución y rango de fechas.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: institucion_id
+          required: false
+          schema: { type: string, format: uuid }
+          description: Filtrar solo revocaciones de una institución específica
+        - in: query
+          name: fecha_desde
+          required: false
+          schema: { type: string, format: date, example: "2026-01-01" }
+        - in: query
+          name: fecha_hasta
+          required: false
+          schema: { type: string, format: date, example: "2026-05-31" }
+      responses:
+        '200':
+          description: Reporte de motivos generado correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccess'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_revocaciones:
+                            type: integer
+                            example: 20
+                          reporte:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                motivo_codigo:
+                                  type: string
+                                  example: ERROR_EMISION
+                                motivo_label:
+                                  type: string
+                                  example: ERROR EMISION
+                                total:
+                                  type: integer
+                                  example: 8
+                                porcentaje:
+                                  type: number
+                                  format: float
+                                  example: 40.0
+              example:
+                data:
+                  total_revocaciones: 20
+                  reporte:
+                    - { motivo_codigo: ERROR_EMISION,         motivo_label: ERROR EMISION,         total: 8, porcentaje: 40.0 }
+                    - { motivo_codigo: DECISION_INSTITUCIONAL, motivo_label: DECISION INSTITUCIONAL, total: 6, porcentaje: 30.0 }
+                    - { motivo_codigo: FRAUDE,                motivo_label: FRAUDE,                total: 4, porcentaje: 20.0 }
+                    - { motivo_codigo: DUPLICADO,             motivo_label: DUPLICADO,             total: 2, porcentaje: 10.0 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { description: Error al generar el reporte }

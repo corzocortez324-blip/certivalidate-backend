@@ -18,7 +18,16 @@ const {
   rotateRefreshToken,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
-} = require('../utils/token.service')
+} = require('../services/token.service')
+const {
+  crearSesion,
+  actualizarSesion,
+  eliminarSesion,
+  eliminarTodasSesiones,
+  listarSesiones,
+  revocarSesionPorId,
+} = require('../services/sesion.service')
+const { registrarIntento, verificarBloqueo } = require('../services/intentoLogin.service')
 
 const getUserAgent = (req) => req.headers['user-agent'] || null
 
@@ -91,16 +100,23 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body
+    const ip        = getClientIp(req)
+    const userAgent = getUserAgent(req)
 
     if (!email || !password) {
       return sendError(res, 'Email y password son obligatorios', 400)
     }
 
-    const usuario = await prisma.usuario.findUnique({
-      where: { email },
-    })
+    // Verificar bloqueo antes de consultar la BD
+    const bloqueo = await verificarBloqueo({ email, ip })
+    if (bloqueo.bloqueado) {
+      return sendError(res, bloqueo.message, bloqueo.status)
+    }
+
+    const usuario = await prisma.usuario.findUnique({ where: { email } })
 
     if (!usuario || usuario.deleted_at) {
+      await registrarIntento({ email, ip, exitoso: false })
       return sendError(res, 'Credenciales inválidas', 401)
     }
 
@@ -111,8 +127,12 @@ const login = async (req, res) => {
     const passwordValida = await bcrypt.compare(password, usuario.password_hash)
 
     if (!passwordValida) {
+      await registrarIntento({ email, ip, exitoso: false })
       return sendError(res, 'Credenciales inválidas', 401)
     }
+
+    // Registrar intento exitoso (limpia el conteo de fallidos implícitamente)
+    await registrarIntento({ email, ip, exitoso: true })
 
     if (usuario.totp_enabled) {
       const partial_token = buildPartialToken(usuario.id)
@@ -121,33 +141,24 @@ const login = async (req, res) => {
 
     const usuarioActualizado = await prisma.usuario.update({
       where: { id: usuario.id },
-      data: { ultimo_acceso: new Date() },
+      data:  { ultimo_acceso: new Date() },
     })
 
-    const token = buildAccessToken(usuario)
+    const token        = buildAccessToken(usuario)
     const refreshToken = buildRefreshToken(usuario)
 
-    await persistRefreshToken({
-      token: refreshToken,
-      usuarioId: usuario.id,
-      ip: getClientIp(req),
-      userAgent: getUserAgent(req),
-    })
+    await persistRefreshToken({ token: refreshToken, usuarioId: usuario.id, ip, userAgent })
+    await crearSesion({ token: refreshToken, usuarioId: usuario.id, ip, userAgent })
 
     const accesos = await obtenerAccesosUsuario(usuario.id)
     const ROL_PRIORIDAD = { admin: 3, editor: 2, lector: 1 }
-    const rolPrincipal = accesos
+    const rolPrincipal  = accesos
       .map((a) => a.rol)
       .sort((a, b) => (ROL_PRIORIDAD[b] || 0) - (ROL_PRIORIDAD[a] || 0))[0] || null
 
     return sendSuccess(
       res,
-      {
-        token,
-        refreshToken,
-        usuario: { ...formatUsuario(usuarioActualizado), rol: rolPrincipal },
-        accesos,
-      },
+      { token, refreshToken, usuario: { ...formatUsuario(usuarioActualizado), rol: rolPrincipal }, accesos },
       'Login exitoso',
       200,
     )
@@ -196,13 +207,15 @@ const refreshToken = async (req, res) => {
       return sendError(res, 'Usuario desactivado', 403)
     }
 
-    const newToken = buildAccessToken(usuario)
+    const newToken        = buildAccessToken(usuario)
     const newRefreshToken = await rotateRefreshToken({
       currentToken: refreshToken,
       usuario,
-      ip: getClientIp(req),
+      ip:        getClientIp(req),
       userAgent: getUserAgent(req),
     })
+
+    await actualizarSesion({ oldToken: refreshToken, newToken: newRefreshToken })
 
     return sendSuccess(
       res,
@@ -224,10 +237,8 @@ const logout = async (req, res) => {
       return sendError(res, 'Refresh token es obligatorio', 400)
     }
 
-    await revokeRefreshToken({
-      token: refreshToken,
-      usuarioId: req.usuario?.id || null,
-    })
+    await revokeRefreshToken({ token: refreshToken, usuarioId: req.usuario?.id || null })
+    await eliminarSesion(refreshToken)
 
     return sendSuccess(res, null, 'Sesión cerrada correctamente', 200)
   } catch (error) {
@@ -341,6 +352,7 @@ const cambiarPassword = async (req, res) => {
     })
 
     await revokeAllUserRefreshTokens(usuarioId)
+    await eliminarTodasSesiones(usuarioId)
 
     await registrarAuditoria(
       prisma,
@@ -431,6 +443,45 @@ const obtenerPermisos = async (req, res) => {
   }
 }
 
+const listarSesionesActivas = async (req, res) => {
+  try {
+    const sesiones = await listarSesiones(req.usuario.id)
+    return sendSuccess(res, { sesiones }, 'Sesiones obtenidas correctamente', 200)
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en listarSesionesActivas')
+    return sendError(res, 'Error al obtener sesiones', 500)
+  }
+}
+
+const revocarSesionActiva = async (req, res) => {
+  try {
+    const sesion = await revocarSesionPorId(req.params.id, req.usuario.id)
+    if (!sesion) return sendError(res, 'Sesión no encontrada', 404)
+
+    // También revocar el refresh token asociado
+    await prisma.refreshToken.updateMany({
+      where: { token_hash: sesion.token_hash, revoked_at: null },
+      data:  { revoked_at: new Date() },
+    })
+
+    return sendSuccess(res, null, 'Sesión revocada correctamente', 200)
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en revocarSesionActiva')
+    return sendError(res, 'Error al revocar sesión', 500)
+  }
+}
+
+const cerrarTodasLasSesiones = async (req, res) => {
+  try {
+    await revokeAllUserRefreshTokens(req.usuario.id)
+    await eliminarTodasSesiones(req.usuario.id)
+    return sendSuccess(res, null, 'Todas las sesiones cerradas correctamente', 200)
+  } catch (error) {
+    logger.error({ err: error, requestId: req.requestId }, 'Error en cerrarTodasLasSesiones')
+    return sendError(res, 'Error al cerrar todas las sesiones', 500)
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -441,4 +492,7 @@ module.exports = {
   cambiarPassword,
   verificarEmail,
   obtenerPermisos,
+  listarSesionesActivas,
+  revocarSesionActiva,
+  cerrarTodasLasSesiones,
 }

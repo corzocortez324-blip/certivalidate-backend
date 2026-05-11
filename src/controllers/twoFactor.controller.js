@@ -6,7 +6,9 @@ const prisma = require('../utils/prisma')
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const { getEnv } = require('../utils/env')
 const logger = require('../utils/logger')
-const { buildAccessToken, buildRefreshToken, buildPartialToken, persistRefreshToken } = require('../utils/token.service')
+const { buildAccessToken, buildRefreshToken, buildPartialToken, persistRefreshToken } = require('../services/token.service')
+const { crearSesion } = require('../services/sesion.service')
+const { registrarIntento } = require('../services/intentoLogin.service')
 const { obtenerAccesosUsuario } = require('../utils/authorization')
 const { getClientIp } = require('../utils/validators')
 
@@ -108,14 +110,13 @@ const verify2FA = async (req, res) => {
 
     await prisma.usuario.update({ where: { id: usuario.id }, data: { ultimo_acceso: new Date() } })
 
-    const token = buildAccessToken(usuario)
+    const ip        = getClientIp(req)
+    const userAgent = req.headers['user-agent'] || null
+    const token        = buildAccessToken(usuario)
     const refreshToken = buildRefreshToken(usuario)
-    await persistRefreshToken({
-      token: refreshToken,
-      usuarioId: usuario.id,
-      ip: getClientIp(req),
-      userAgent: req.headers['user-agent'] || null,
-    })
+    await persistRefreshToken({ token: refreshToken, usuarioId: usuario.id, ip, userAgent })
+    await crearSesion({ token: refreshToken, usuarioId: usuario.id, ip, userAgent })
+    await registrarIntento({ email: usuario.email, ip, exitoso: true })
 
     const accesos = await obtenerAccesosUsuario(usuario.id)
     const ROL_PRIORIDAD = { admin: 3, editor: 2, lector: 1 }

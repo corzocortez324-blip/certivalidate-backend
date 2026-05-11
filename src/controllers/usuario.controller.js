@@ -6,6 +6,21 @@ const { getClientIp } = require('../utils/validators')
 const { enviarEmailBienvenida } = require('../utils/mailer')
 const logger = require('../utils/logger')
 
+async function validarDominioInstitucional(email, institucionId) {
+  if (!institucionId || !email) return null
+  const inst = await prisma.institucion.findUnique({
+    where: { id: institucionId },
+    select: { dominio: true, nombre: true },
+  })
+  if (!inst?.dominio) return null
+  const emailDomain = email.split('@')[1]?.toLowerCase()
+  const instDomain  = inst.dominio.toLowerCase().replace(/^@/, '')
+  if (emailDomain !== instDomain) {
+    return `El email debe pertenecer al dominio @${instDomain} (institución: ${inst.nombre})`
+  }
+  return null
+}
+
 const formatUsuario = (usuario, rolPrincipal = null) => {
   const { password_hash, token_verificacion, token_verificacion_expira, ...datos } = usuario
   return { ...datos, rol: rolPrincipal }
@@ -103,6 +118,9 @@ const crearUsuario = async (req, res) => {
     const institucionId = req.institucionIds?.[0]
     if (!institucionId) return sendError(res, 'No tiene institución asignada', 403)
 
+    const dominioError = await validarDominioInstitucional(email, institucionId)
+    if (dominioError) return sendError(res, dominioError, 422)
+
     const hash = await bcrypt.hash(password, 12)
 
     const nuevoUsuario = await prisma.usuario.create({
@@ -155,6 +173,9 @@ const actualizarUsuario = async (req, res) => {
     if (email && email !== usuario.email) {
       const emailUsado = await prisma.usuario.findUnique({ where: { email } })
       if (emailUsado) return sendError(res, 'El email ya está en uso', 409)
+
+      const dominioError = await validarDominioInstitucional(email, req.institucionIds?.[0])
+      if (dominioError) return sendError(res, dominioError, 422)
     }
 
     const valoresAntes = JSON.stringify({ nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, activo: usuario.activo })

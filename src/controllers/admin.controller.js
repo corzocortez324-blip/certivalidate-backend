@@ -1,3 +1,4 @@
+const { Prisma } = require('@prisma/client')
 const { sendSuccess, sendError } = require('../utils/response.utils')
 const prisma = require('../utils/prisma')
 
@@ -34,6 +35,8 @@ const getStats = async (req, res) => {
       verificacionesPorMes,
       topEmisores,
       ultimasRevocaciones,
+      emisionesDiarias,
+      verificacionesDiarias,
     ] = await Promise.all([
       prisma.certificado.count({ where: { deleted_at: null } }),
       prisma.certificado.count({ where: { deleted_at: null, estado: 'revocado' } }),
@@ -77,6 +80,22 @@ const getStats = async (req, res) => {
           },
         },
       }),
+      prisma.$queryRaw`
+        SELECT DATE_TRUNC('day', fecha_emision)::date AS dia,
+               COUNT(*)::int AS total_emitidos,
+               COUNT(*) FILTER (WHERE estado = 'revocado')::int AS total_revocados
+        FROM "Certificado"
+        WHERE deleted_at IS NULL
+          AND fecha_emision >= NOW() - INTERVAL '90 days'
+        GROUP BY 1 ORDER BY 1
+      `,
+      prisma.$queryRaw`
+        SELECT DATE_TRUNC('day', fecha)::date AS dia,
+               COUNT(*)::int AS total
+        FROM "VerificacionPublica"
+        WHERE fecha >= NOW() - INTERVAL '30 days'
+        GROUP BY 1 ORDER BY 1
+      `,
     ])
 
     // Merge monthly trend filling gaps with zeros
@@ -127,10 +146,75 @@ const getStats = async (req, res) => {
           ? `${r.certificado.estudiante.nombre} ${r.certificado.estudiante.apellido}`
           : null,
       })),
+      emisionesDiarias: emisionesDiarias.map((r) => ({
+        dia: r.dia,
+        total_emitidos: Number(r.total_emitidos),
+        total_revocados: Number(r.total_revocados),
+      })),
+      verificacionesDiarias: verificacionesDiarias.map((r) => ({
+        dia: r.dia,
+        total: Number(r.total),
+      })),
     })
   } catch (err) {
     sendError(res, err.message, 500)
   }
 }
 
-module.exports = { getStats }
+// T-76: Reporte de motivos frecuentes de revocación
+const getReporteMotivos = async (req, res) => {
+  try {
+    const { institucion_id, fecha_desde, fecha_hasta } = req.query
+
+    const instFilter  = institucion_id ? Prisma.sql`AND c.institucion_id = ${institucion_id}` : Prisma.empty
+    const desdeFilter = fecha_desde    ? Prisma.sql`AND r.fecha_revocacion >= ${new Date(fecha_desde)}` : Prisma.empty
+    const hastaFilter = fecha_hasta    ? Prisma.sql`AND r.fecha_revocacion <= ${new Date(fecha_hasta)}` : Prisma.empty
+
+    const rows = await prisma.$queryRaw`
+      SELECT r.motivo_codigo, COUNT(*)::int AS total
+      FROM "Revocacion" r
+      JOIN "Certificado" c ON c.id = r.certificado_id
+      WHERE TRUE
+        ${instFilter}
+        ${desdeFilter}
+        ${hastaFilter}
+      GROUP BY r.motivo_codigo
+      ORDER BY total DESC
+    `
+
+    const totalRevocaciones = rows.reduce((sum, r) => sum + Number(r.total), 0)
+    const reporte = rows.map((r) => ({
+      motivo_codigo: r.motivo_codigo,
+      motivo_label: r.motivo_codigo.replace(/_/g, ' '),
+      total: Number(r.total),
+      porcentaje: totalRevocaciones > 0
+        ? Math.round((Number(r.total) / totalRevocaciones) * 1000) / 10
+        : 0,
+    }))
+
+    return sendSuccess(res, { reporte, total_revocaciones: totalRevocaciones }, 'Reporte de motivos generado', 200)
+  } catch (err) {
+    sendError(res, err.message, 500)
+  }
+}
+
+// T-98/T-104: Stats desde vistas materializadas (rápido, sin cómputo en tiempo real)
+const getStatsMV = async (req, res) => {
+  try {
+    const [certRows, emisionRows, verifRows] = await Promise.all([
+      prisma.$queryRaw`SELECT * FROM public.v_estadisticas_certificados LIMIT 1`,
+      prisma.$queryRaw`SELECT * FROM public.v_estadisticas_emisiones ORDER BY dia`,
+      prisma.$queryRaw`SELECT * FROM public.v_estadisticas_verificacion LIMIT 1`,
+    ])
+
+    return sendSuccess(res, {
+      certificados:    certRows[0]  ?? null,
+      emisiones:       emisionRows,
+      verificaciones:  verifRows[0] ?? null,
+    }, 'Estadísticas desde vistas materializadas', 200)
+  } catch (err) {
+    sendError(res, err.message, 500)
+  }
+}
+
+module.exports = { getStats, getReporteMotivos, getStatsMV }

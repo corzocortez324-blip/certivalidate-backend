@@ -1,7 +1,7 @@
 const crypto = require('crypto')
 const jwt = require('jsonwebtoken')
-const prisma = require('./prisma')
-const { getEnv } = require('./env')
+const prisma = require('../utils/prisma')
+const { getEnv } = require('../utils/env')
 
 const hashToken = (token) =>
   crypto.createHash('sha256').update(token).digest('hex')

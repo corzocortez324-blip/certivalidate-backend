@@ -11,6 +11,9 @@ const {
   cambiarPassword,
   verificarEmail,
   obtenerPermisos,
+  listarSesionesActivas,
+  revocarSesionActiva,
+  cerrarTodasLasSesiones,
 } = require('../controllers/auth.controller')
 const { setup2FA, enable2FA, disable2FA, verify2FA } = require('../controllers/twoFactor.controller')
 const { verificarToken, requireEmailVerified } = require('../middlewares/auth.middleware')
@@ -46,6 +49,11 @@ router.put(
   handleValidationErrors,
   cambiarPassword,
 )
+
+// Sesiones activas
+router.get('/sesiones',          verificarToken, listarSesionesActivas)
+router.delete('/sesiones/todas', verificarToken, cerrarTodasLasSesiones)
+router.delete('/sesiones/:id',   verificarToken, revocarSesionActiva)
 
 // Rutas 2FA
 router.get('/2fa/setup', verificarToken, setup2FA)

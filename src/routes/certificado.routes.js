@@ -10,6 +10,7 @@ const {
   obtenerCertificado,
   obtenerVerificaciones,
   obtenerRevocaciones,
+  obtenerMotivoRevocacion,
   revocarCertificado,
 } = require('../controllers/certificado.controller')
 const {
@@ -71,6 +72,17 @@ router.get(
   validateUUIDParam('id'),
   handleValidationErrors,
   obtenerRevocaciones,
+)
+// T-73: motivo de revocación — solo admin/emisor de la institución (NO portal público)
+router.get(
+  '/:id/revocacion',
+  verificarToken,
+  requireEmailVerified,
+  cargarInstitucionesUsuario,
+  requirePermission('certificado', 'ver'),
+  validateUUIDParam('id'),
+  handleValidationErrors,
+  obtenerMotivoRevocacion,
 )
 router.get(
   '/:id',
