@@ -194,14 +194,11 @@ const actualizarUsuario = async (req, res) => {
     if (rol) {
       const rolRegistro = await prisma.rol.findUnique({ where: { nombre: rol } })
       if (rolRegistro) {
-        const institucionId = req.institucionIds?.[0]
-        if (institucionId) {
-          await prisma.usuarioInstitucion.upsert({
-            where: { usuario_id_institucion_id: { usuario_id: id, institucion_id: institucionId } },
-            update: { rol_id: rolRegistro.id },
-            create: { usuario_id: id, institucion_id: institucionId, rol_id: rolRegistro.id },
-          })
-        }
+        // Actualizar el rol en TODAS las instituciones del usuario para mantener consistencia
+        await prisma.usuarioInstitucion.updateMany({
+          where: { usuario_id: id },
+          data: { rol_id: rolRegistro.id },
+        })
       }
     }
 
